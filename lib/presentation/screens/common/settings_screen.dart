@@ -1,17 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
+import 'package:fitbase/config/navigation/custom_navigator.dart';
+import 'package:fitbase/presentation/providers/auth_provider.dart';
+import 'package:fitbase/presentation/widgets/custom_button.dart';
+import 'package:fitbase/presentation/screens/common/change_password_screen.dart';
+import 'package:fitbase/presentation/screens/user/user_profile_screen.dart';
+import 'package:fitbase/presentation/screens/auth_gate.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool _pushNotifications = true;
-  bool _biometrics = false;
-  bool _autoRenew = true;
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _pushNotifications = ValueNotifier<bool>(true);
+  final _biometrics = ValueNotifier<bool>(false);
+  final _autoRenew = ValueNotifier<bool>(true);
+
+  @override
+  void dispose() {
+    _pushNotifications.dispose();
+    _biometrics.dispose();
+    _autoRenew.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,30 +51,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         children: [
           _buildSectionHeader('Preferencias'),
-          _buildSwitchTile(
-            title: 'Notificaciones Push',
-            subtitle: 'Alertas de horarios y recordatorios',
-            value: _pushNotifications,
-            onChanged: (val) => setState(() => _pushNotifications = val),
+          ValueListenableBuilder<bool>(
+            valueListenable: _pushNotifications,
+            builder: (context, val, _) => _buildSwitchTile(
+              title: 'Notificaciones Push',
+              subtitle: 'Alertas de horarios y recordatorios',
+              value: val,
+              onChanged: (newVal) => _pushNotifications.value = newVal,
+            ),
           ),
-          _buildSwitchTile(
-            title: 'Acceso Biométrico',
-            subtitle: 'Ingreso rápido con huella o Face ID',
-            value: _biometrics,
-            onChanged: (val) => setState(() => _biometrics = val),
+          ValueListenableBuilder<bool>(
+            valueListenable: _biometrics,
+            builder: (context, val, _) => _buildSwitchTile(
+              title: 'Acceso Biométrico',
+              subtitle: 'Ingreso rápido con huella o Face ID',
+              value: val,
+              onChanged: (newVal) => _biometrics.value = newVal,
+            ),
           ),
-          _buildSwitchTile(
-            title: 'Renovación Automática',
-            subtitle: 'Cobro recurrente al vencer membresía',
-            value: _autoRenew,
-            onChanged: (val) => setState(() => _autoRenew = val),
+          ValueListenableBuilder<bool>(
+            valueListenable: _autoRenew,
+            builder: (context, val, _) => _buildSwitchTile(
+              title: 'Renovación Automática',
+              subtitle: 'Cobro recurrente al vencer membresía',
+              value: val,
+              onChanged: (newVal) => _autoRenew.value = newVal,
+            ),
           ),
           const SizedBox(height: 20),
           _buildSectionHeader('Cuenta y Seguridad'),
           _buildNavTile(
+            title: 'Ver Mi Perfil',
+            icon: Icons.person_outline_rounded,
+            onTap: () {
+              CustomNavigator.pushFade(context, const UserProfileScreen());
+            },
+          ),
+          _buildNavTile(
             title: 'Cambiar Contraseña',
             icon: Icons.lock_outline_rounded,
-            onTap: () {},
+            onTap: () {
+              CustomNavigator.pushFade(context, const ChangePasswordScreen());
+            },
           ),
           _buildNavTile(
             title: 'Métodos de Pago Guardados',
@@ -88,7 +121,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.chat_bubble_outline_rounded,
             onTap: () {},
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 28),
+          CustomButton(
+            text: 'Cerrar Sesión',
+            isOutlined: true,
+            icon: Icons.logout_rounded,
+            onPressed: () => _confirmLogout(context),
+          ),
+          const SizedBox(height: 28),
           Center(
             child: Text(
               'Fitbase App v1.0.0',
@@ -99,6 +139,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('¿Cerrar sesión?', style: TextStyle(color: AppColors.textPrimary)),
+        content: const Text(
+          'Se cerrará tu sesión actual y regresarás a la pantalla de inicio.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) {
+                CustomNavigator.pushAndRemoveUntilFade(context, const AuthGate());
+              }
+            },
+            child: const Text('Cerrar Sesión', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
         ],
       ),
     );

@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
 import 'package:fitbase/config/navigation/custom_navigator.dart';
 import 'package:fitbase/presentation/widgets/plan_card.dart';
 import 'package:fitbase/presentation/widgets/gym_location_card.dart';
 import 'package:fitbase/presentation/screens/auth/register_screen.dart';
+import 'package:fitbase/presentation/providers/auth_provider.dart';
+import 'package:fitbase/presentation/screens/auth_gate.dart';
 
-class GuestHomeScreen extends StatefulWidget {
+class GuestHomeScreen extends ConsumerStatefulWidget {
   const GuestHomeScreen({super.key});
 
   @override
-  State<GuestHomeScreen> createState() => _GuestHomeScreenState();
+  ConsumerState<GuestHomeScreen> createState() => _GuestHomeScreenState();
 }
 
-class _GuestHomeScreenState extends State<GuestHomeScreen> with SingleTickerProviderStateMixin {
+class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -29,6 +32,11 @@ class _GuestHomeScreenState extends State<GuestHomeScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider).value;
+    if (authState != null && authState.authenticated) {
+      return const AuthGate();
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(

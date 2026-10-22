@@ -12,7 +12,13 @@ class AdminSubscribersScreen extends StatefulWidget {
 }
 
 class _AdminSubscribersScreenState extends State<AdminSubscribersScreen> {
-  String _activeFilter = 'Todos';
+  final _activeFilter = ValueNotifier<String>('Todos');
+
+  @override
+  void dispose() {
+    _activeFilter.dispose();
+    super.dispose();
+  }
 
   final List<Map<String, dynamic>> _subscribers = [
     {
@@ -66,7 +72,10 @@ class _AdminSubscribersScreenState extends State<AdminSubscribersScreen> {
         elevation: 0,
         leading: widget.isModal
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppColors.textPrimary,
+                ),
                 onPressed: () => Navigator.of(context).pop(),
               )
             : null,
@@ -93,57 +102,80 @@ class _AdminSubscribersScreenState extends State<AdminSubscribersScreen> {
                 style: TextStyle(color: AppColors.textPrimary),
                 decoration: InputDecoration(
                   hintText: 'Buscar suscriptor por nombre o email...',
-                  hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                  hintStyle: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 14,
+                  ),
                   icon: Icon(Icons.search, color: AppColors.textSecondary),
                   border: InputBorder.none,
                 ),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              children: [
-                _buildFilterChip('Todos'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Activo'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Por Vencer'),
-                const SizedBox(width: 8),
-                _buildFilterChip('Vencido'),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              itemCount: _filteredSubscribers.length,
-              itemBuilder: (context, index) {
-                final sub = _filteredSubscribers[index];
-                return _buildSubscriberCard(sub);
-              },
-            ),
+          ValueListenableBuilder<String>(
+            valueListenable: _activeFilter,
+            builder: (context, activeFilter, _) {
+              final filtered = _getFilteredSubscribers(activeFilter);
+              return Expanded(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          _buildFilterChip('Todos', activeFilter),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('Activo', activeFilter),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('Por Vencer', activeFilter),
+                          const SizedBox(width: 8),
+                          _buildFilterChip('Vencido', activeFilter),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 8,
+                        ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final sub = filtered[index];
+                          return _buildSubscriberCard(sub);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
     );
   }
 
-  List<Map<String, dynamic>> get _filteredSubscribers {
-    if (_activeFilter == 'Todos') return _subscribers;
-    return _subscribers.where((s) => s['status'] == _activeFilter).toList();
+  List<Map<String, dynamic>> _getFilteredSubscribers(String filter) {
+    if (filter == 'Todos') return _subscribers;
+    return _subscribers.where((s) => s['status'] == filter).toList();
   }
 
-  Widget _buildFilterChip(String label) {
-    final isSelected = _activeFilter == label;
+  Widget _buildFilterChip(String label, String activeFilter) {
+    final isSelected = activeFilter == label;
     return GestureDetector(
-      onTap: () => setState(() => _activeFilter = label),
+      onTap: () => _activeFilter.value = label,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+          ),
         ),
         child: Text(
           label,
@@ -226,7 +258,10 @@ class _AdminSubscribersScreenState extends State<AdminSubscribersScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withAlpha(30),
                   borderRadius: BorderRadius.circular(10),
@@ -251,22 +286,36 @@ class _AdminSubscribersScreenState extends State<AdminSubscribersScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Plan Asignado', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                  const Text(
+                    'Plan Asignado',
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     '${sub['plan']} (${sub['amount']})',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text('Vencimiento', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                  const Text(
+                    'Vencimiento',
+                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     sub['expiry'],
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ],
               ),
@@ -281,9 +330,14 @@ class _AdminSubscribersScreenState extends State<AdminSubscribersScreen> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
                     side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text('Modificar Suscripción / Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Modificar Suscripción / Plan',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -319,37 +373,77 @@ class _AdminSubscribersScreenState extends State<AdminSubscribersScreen> {
             const SizedBox(height: 18),
             Text(
               'Modificar Suscripción de ${sub['name']}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
             ),
             const SizedBox(height: 16),
-            const Text('Acciones Rápidas:', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            const Text(
+              'Acciones Rápidas:',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 12),
             ListTile(
-              leading: const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
-              title: const Text('Cambiar Plan Asignado', style: TextStyle(color: AppColors.textPrimary)),
-              subtitle: const Text('Asignar Básico, Black Pro o VIP', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              leading: const Icon(
+                Icons.swap_horiz_rounded,
+                color: AppColors.primary,
+              ),
+              title: const Text(
+                'Cambiar Plan Asignado',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: const Text(
+                'Asignar Básico, Black Pro o VIP',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
               onTap: () {
                 Navigator.of(ctx).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Plan modificado con éxito'), backgroundColor: AppColors.success),
+                  const SnackBar(
+                    content: Text('Plan modificado con éxito'),
+                    backgroundColor: AppColors.success,
+                  ),
                 );
               },
             ),
             ListTile(
-              leading: const Icon(Icons.date_range_rounded, color: AppColors.primary),
-              title: const Text('Extender Fecha de Vencimiento', style: TextStyle(color: AppColors.textPrimary)),
-              subtitle: const Text('Añadir 30 días de cortesía', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              leading: const Icon(
+                Icons.date_range_rounded,
+                color: AppColors.primary,
+              ),
+              title: const Text(
+                'Extender Fecha de Vencimiento',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: const Text(
+                'Añadir 30 días de cortesía',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
               onTap: () {
                 Navigator.of(ctx).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Fecha extendida 30 días'), backgroundColor: AppColors.success),
+                  const SnackBar(
+                    content: Text('Fecha extendida 30 días'),
+                    backgroundColor: AppColors.success,
+                  ),
                 );
               },
             ),
             ListTile(
-              leading: const Icon(Icons.pause_circle_outline_rounded, color: AppColors.warning),
-              title: const Text('Congelar Suscripción', style: TextStyle(color: AppColors.textPrimary)),
-              subtitle: const Text('Pausar cobros temporalmente', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              leading: const Icon(
+                Icons.pause_circle_outline_rounded,
+                color: AppColors.warning,
+              ),
+              title: const Text(
+                'Congelar Suscripción',
+                style: TextStyle(color: AppColors.textPrimary),
+              ),
+              subtitle: const Text(
+                'Pausar cobros temporalmente',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
               onTap: () {
                 Navigator.of(ctx).pop();
               },

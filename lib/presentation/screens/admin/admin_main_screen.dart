@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
+import 'package:fitbase/presentation/providers/auth_provider.dart';
+import 'package:fitbase/presentation/screens/auth_gate.dart';
 import 'package:fitbase/presentation/screens/admin/admin_dashboard_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_subscribers_screen.dart';
+import 'package:fitbase/presentation/screens/admin/admin_managers_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_plans_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_payments_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_gym_edit_screen.dart';
 
-class AdminMainScreen extends StatefulWidget {
+class AdminMainScreen extends ConsumerStatefulWidget {
   const AdminMainScreen({super.key});
 
   @override
-  State<AdminMainScreen> createState() => _AdminMainScreenState();
+  ConsumerState<AdminMainScreen> createState() => _AdminMainScreenState();
 }
 
-class _AdminMainScreenState extends State<AdminMainScreen> {
+class _AdminMainScreenState extends ConsumerState<AdminMainScreen> {
   int _currentIndex = 0;
 
   late final List<Widget> _screens;
@@ -30,6 +34,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
         },
       ),
       const AdminSubscribersScreen(),
+      const AdminManagersScreen(),
       const AdminPlansScreen(),
       const AdminPaymentsScreen(),
       const AdminGymEditScreen(),
@@ -38,6 +43,14 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider).value;
+    if (authState == null || !authState.authenticated) {
+      return const AuthGate();
+    }
+    final roleId = authState.authData?.roleId ?? 0;
+    if (roleId != 2 && roleId != 3) {
+      return const AuthGate();
+    }
     return PopScope(
       canPop: _currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
@@ -62,15 +75,16 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildNavItem(0, Icons.dashboard_rounded, 'Panel'),
-                  _buildNavItem(1, Icons.group_rounded, 'Usuarios'),
-                  _buildNavItem(2, Icons.layers_rounded, 'Planes'),
-                  _buildNavItem(3, Icons.payments_rounded, 'Pagos'),
-                  _buildNavItem(4, Icons.storefront_rounded, 'Sede'),
+                  _buildNavItem(1, Icons.group_rounded, 'Socios'),
+                  _buildNavItem(2, Icons.badge_rounded, 'Staff'),
+                  _buildNavItem(3, Icons.layers_rounded, 'Planes'),
+                  _buildNavItem(4, Icons.payments_rounded, 'Pagos'),
+                  _buildNavItem(5, Icons.storefront_rounded, 'Sede'),
                 ],
               ),
             ),
@@ -92,25 +106,28 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: isSelected ? 10 : 6,
+          vertical: 6,
+        ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 22,
+              size: 20,
               color: isSelected ? AppColors.onPrimary : AppColors.textSecondary,
             ),
             if (isSelected) ...[
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: AppColors.onPrimary,
                 ),

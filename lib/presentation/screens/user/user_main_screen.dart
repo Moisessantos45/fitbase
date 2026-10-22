@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
+import 'package:fitbase/presentation/providers/auth_provider.dart';
+import 'package:fitbase/presentation/screens/auth_gate.dart';
 import 'package:fitbase/presentation/screens/user/user_home_screen.dart';
 import 'package:fitbase/presentation/screens/user/user_plans_screen.dart';
 import 'package:fitbase/presentation/screens/user/user_payments_screen.dart';
 import 'package:fitbase/presentation/screens/user/gym_map_screen.dart';
 import 'package:fitbase/presentation/screens/common/profile_screen.dart';
 
-class UserMainScreen extends StatefulWidget {
+class UserMainScreen extends ConsumerStatefulWidget {
   const UserMainScreen({super.key});
 
   @override
-  State<UserMainScreen> createState() => _UserMainScreenState();
+  ConsumerState<UserMainScreen> createState() => _UserMainScreenState();
 }
 
-class _UserMainScreenState extends State<UserMainScreen> {
+class _UserMainScreenState extends ConsumerState<UserMainScreen> {
   int _currentIndex = 0;
 
   late final List<Widget> _screens;
@@ -38,6 +41,14 @@ class _UserMainScreenState extends State<UserMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider).value;
+    if (authState == null || !authState.authenticated) {
+      return const AuthGate();
+    }
+    final roleId = authState.authData?.roleId ?? 0;
+    if (roleId != 1) {
+      return const AuthGate();
+    }
     return PopScope(
       canPop: _currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {

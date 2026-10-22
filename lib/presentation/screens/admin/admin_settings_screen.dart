@@ -1,32 +1,90 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
+import 'package:fitbase/config/navigation/custom_navigator.dart';
+import 'package:fitbase/presentation/providers/auth_provider.dart';
+import 'package:fitbase/presentation/providers/owner_provider.dart';
 import 'package:fitbase/presentation/widgets/custom_button.dart';
+import 'package:fitbase/presentation/screens/admin/admin_managers_screen.dart';
+import 'package:fitbase/presentation/screens/admin/admin_profile_screen.dart';
+import 'package:fitbase/presentation/screens/manger/manager_profile_screen.dart';
+import 'package:fitbase/presentation/screens/common/change_password_screen.dart';
+import 'package:fitbase/presentation/screens/auth_gate.dart';
 
-class AdminSettingsScreen extends StatefulWidget {
+class AdminSettingsScreen extends ConsumerStatefulWidget {
   const AdminSettingsScreen({super.key});
 
   @override
-  State<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
+  ConsumerState<AdminSettingsScreen> createState() => _AdminSettingsScreenState();
 }
 
-class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
-  bool _capacityAlerts = true;
-  bool _dailyReportEmail = true;
-  bool _autoBackup = true;
+class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
+  final _capacityAlerts = ValueNotifier<bool>(true);
+  final _dailyReportEmail = ValueNotifier<bool>(true);
+  final _autoBackup = ValueNotifier<bool>(true);
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      final user = ref.read(authProvider).value?.authData;
+      if (user?.roleId == 2) {
+        ref.read(ownerProvider.notifier).getOwner();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _capacityAlerts.dispose();
+    _dailyReportEmail.dispose();
+    _autoBackup.dispose();
+    super.dispose();
+  }
+
+  void _navigateToProfile() {
+    final user = ref.read(authProvider).value?.authData;
+    if (user?.roleId == 2) {
+      CustomNavigator.pushFade(context, const AdminProfileScreen());
+    } else {
+      CustomNavigator.pushFade(context, const ManagerProfileScreen());
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final authUser = ref.watch(authProvider).value?.authData;
+    final owner = ref.watch(ownerProvider).value;
+
+    final displayName = (owner != null &&
+            (owner.firstName.isNotEmpty || owner.lastName.isNotEmpty))
+        ? '${owner.firstName} ${owner.lastName}'.trim()
+        : (authUser?.roleId == 2
+            ? 'Propietario de Gimnasio'
+            : 'Encargado de Sucursal');
+
+    final displayEmail = authUser?.email.isNotEmpty == true
+        ? authUser!.email
+        : 'admin@fitbase.io';
+
+    final displayRole = authUser?.roleId == 2
+        ? 'Rol: Propietario (Owner)'
+        : 'Rol: Encargado (Manager)';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.textPrimary,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Configuración del Administrador',
+          'Configuración',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: AppColors.textPrimary,
@@ -36,88 +94,148 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _navigateToProfile,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary, width: 2),
-                  ),
-                  child: const Icon(Icons.admin_panel_settings, color: AppColors.primary, size: 28),
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border),
                 ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Administrador General',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceLight,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primary, width: 2),
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        'admin@fitbasegym.com',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
+                      child: (owner != null && owner.avatarUrl.isNotEmpty)
+                          ? ClipOval(
+                              child: Image.network(
+                                owner.avatarUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(
+                                  authUser?.roleId == 2
+                                      ? Icons.business_center_rounded
+                                      : Icons.manage_accounts_rounded,
+                                  color: AppColors.primary,
+                                  size: 28,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              authUser?.roleId == 2
+                                  ? Icons.business_center_rounded
+                                  : Icons.manage_accounts_rounded,
+                              color: AppColors.primary,
+                              size: 28,
+                            ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            displayEmail,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            displayRole,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: AppColors.textSecondary,
+                      size: 16,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 24),
           _buildSectionHeader('Alertas del Gimnasio'),
-          _buildSwitchTile(
-            title: 'Alertas de Aforo Máximo',
-            subtitle: 'Notificar cuando se supere el 80% de capacidad',
-            value: _capacityAlerts,
-            onChanged: (val) => setState(() => _capacityAlerts = val),
+          ValueListenableBuilder<bool>(
+            valueListenable: _capacityAlerts,
+            builder: (context, val, _) => _buildSwitchTile(
+              title: 'Alertas de Aforo Máximo',
+              subtitle: 'Notificar cuando se supere el 80% de capacidad',
+              value: val,
+              onChanged: (newVal) => _capacityAlerts.value = newVal,
+            ),
           ),
-          _buildSwitchTile(
-            title: 'Resumen Diario por Correo',
-            subtitle: 'Enviar reporte diario de nuevos pagos y accesos',
-            value: _dailyReportEmail,
-            onChanged: (val) => setState(() => _dailyReportEmail = val),
+          ValueListenableBuilder<bool>(
+            valueListenable: _dailyReportEmail,
+            builder: (context, val, _) => _buildSwitchTile(
+              title: 'Resumen Diario por Correo',
+              subtitle: 'Enviar reporte diario de nuevos pagos y accesos',
+              value: val,
+              onChanged: (newVal) => _dailyReportEmail.value = newVal,
+            ),
           ),
-          _buildSwitchTile(
-            title: 'Respaldo Automático',
-            subtitle: 'Copia de seguridad nocturna de usuarios y pagos',
-            value: _autoBackup,
-            onChanged: (val) => setState(() => _autoBackup = val),
+          ValueListenableBuilder<bool>(
+            valueListenable: _autoBackup,
+            builder: (context, val, _) => _buildSwitchTile(
+              title: 'Respaldo Automático',
+              subtitle: 'Copia de seguridad nocturna de usuarios y pagos',
+              value: val,
+              onChanged: (newVal) => _autoBackup.value = newVal,
+            ),
           ),
           const SizedBox(height: 20),
           _buildSectionHeader('Gestión y Seguridad'),
           _buildNavTile(
-            title: 'Gestionar Otros Administradores',
-            icon: Icons.manage_accounts_outlined,
-            onTap: () {},
+            title: authUser?.roleId == 2
+                ? 'Ver Perfil de Propietario'
+                : 'Ver Perfil de Encargado',
+            icon: Icons.person_outline_rounded,
+            onTap: _navigateToProfile,
           ),
           _buildNavTile(
-            title: 'Exportar Reporte Financiero (CSV/PDF)',
-            icon: Icons.file_download_outlined,
-            onTap: () {},
+            title: 'Gestionar Encargados y Personal',
+            icon: Icons.badge_outlined,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const AdminManagersScreen(isModal: true)),
+              );
+            },
           ),
           _buildNavTile(
-            title: 'Cambiar Contraseña de Administrador',
+            title: 'Cambiar Contraseña',
             icon: Icons.lock_outline_rounded,
-            onTap: () {},
+            onTap: () {
+              CustomNavigator.pushFade(context, const ChangePasswordScreen());
+            },
           ),
           const SizedBox(height: 28),
           CustomButton(
@@ -162,7 +280,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           side: const BorderSide(color: AppColors.border),
         ),
         child: SwitchListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 4,
+          ),
           activeThumbColor: AppColors.onPrimary,
           activeTrackColor: AppColors.primary,
           inactiveThumbColor: AppColors.textSecondary,
@@ -177,10 +298,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           ),
           subtitle: Text(
             subtitle,
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 12,
-            ),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
           value: value,
           onChanged: onChanged,
@@ -204,7 +322,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         ),
         child: ListTile(
           onTap: onTap,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 2,
+          ),
           leading: Icon(icon, color: AppColors.textSecondary, size: 22),
           title: Text(
             title,
@@ -230,7 +351,10 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('¿Cerrar sesión?', style: TextStyle(color: AppColors.textPrimary)),
+        title: const Text(
+          '¿Cerrar sesión?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
         content: const Text(
           'Se cerrará la sesión de administrador y regresarás a la pantalla de inicio.',
           style: TextStyle(color: AppColors.textSecondary),
@@ -238,15 +362,27 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) {
+                CustomNavigator.pushAndRemoveUntilFade(context, const AuthGate());
+              }
             },
-            child: const Text('Cerrar Sesión', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Cerrar Sesión',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),

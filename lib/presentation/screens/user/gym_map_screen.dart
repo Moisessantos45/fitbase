@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
 import 'package:fitbase/presentation/widgets/gym_location_card.dart';
 
@@ -12,9 +14,10 @@ class GymMapScreen extends StatefulWidget {
 }
 
 class _GymMapScreenState extends State<GymMapScreen> {
-  int _selectedGymIndex = 0;
+  late final MapController _mapController;
+  final _selectedGymIndex = ValueNotifier<int>(0);
 
-  final List<Map<String, String>> _gyms = [
+  final List<Map<String, dynamic>> _gyms = [
     {
       'name': 'Fitbase Central Hub',
       'address': 'Av. Insurgentes Sur 1450, Del Valle',
@@ -22,6 +25,7 @@ class _GymMapScreenState extends State<GymMapScreen> {
       'schedule': '24 Horas',
       'phone': '+52 55 1234 5678',
       'rating': '4.9',
+      'location': const LatLng(19.3780, -99.1780),
     },
     {
       'name': 'Fitbase Polanco Elite',
@@ -30,6 +34,7 @@ class _GymMapScreenState extends State<GymMapScreen> {
       'schedule': '05:00 - 23:00',
       'phone': '+52 55 8765 4321',
       'rating': '4.8',
+      'location': const LatLng(19.4326, -99.1950),
     },
     {
       'name': 'Fitbase Santa Fe',
@@ -38,19 +43,42 @@ class _GymMapScreenState extends State<GymMapScreen> {
       'schedule': '06:00 - 22:00',
       'phone': '+52 55 4567 8901',
       'rating': '4.7',
+      'location': const LatLng(19.3590, -99.2600),
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _mapController = MapController();
+  }
+
+  @override
+  void dispose() {
+    _mapController.dispose();
+    _selectedGymIndex.dispose();
+    super.dispose();
+  }
+
+  void _onSelectGym(int index) {
+    _selectedGymIndex.value = index;
+    final LatLng loc = _gyms[index]['location'] as LatLng;
+    _mapController.move(loc, 15.5);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.surface,
         elevation: 0,
         leading: widget.isModal
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: AppColors.textPrimary,
+                ),
                 onPressed: () => Navigator.of(context).pop(),
               )
             : null,
@@ -62,139 +90,159 @@ class _GymMapScreenState extends State<GymMapScreen> {
           ),
         ),
       ),
-      body: Stack(
-        children: [
-          Container(
-            width: double.infinity,
-            height: double.infinity,
-            color: const Color(0xFF191F26),
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _MapGridPainter(),
+      body: ValueListenableBuilder<int>(
+        valueListenable: _selectedGymIndex,
+        builder: (context, selectedIndex, _) {
+          final currentLoc = _gyms[selectedIndex]['location'] as LatLng;
+
+          return Stack(
+            children: [
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: currentLoc,
+                  initialZoom: 14.5,
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.fitbase.app',
+                  ),
+                  MarkerLayer(
+                    markers: List.generate(_gyms.length, (index) {
+                      final item = _gyms[index];
+                      final isSelected = selectedIndex == index;
+                      final LatLng pt = item['location'] as LatLng;
+
+                      return Marker(
+                        point: pt,
+                        width: 140,
+                        height: 70,
+                        child: GestureDetector(
+                          onTap: () => _onSelectGym(index),
+                          child: Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.surface,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.primary),
+                                ),
+                                child: Text(
+                                  item['name'].toString().replaceAll(
+                                        'Fitbase ',
+                                        '',
+                                      ),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? AppColors.onPrimary
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.location_on_rounded,
+                                size: isSelected ? 36 : 28,
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.error,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+              Positioned(
+                top: 16,
+                left: 20,
+                right: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withAlpha(240),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const TextField(
+                    style: TextStyle(color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Buscar gimnasio o zona...',
+                      hintStyle: TextStyle(color: AppColors.textMuted),
+                      icon: Icon(Icons.search, color: AppColors.primary),
+                      border: InputBorder.none,
+                    ),
                   ),
                 ),
-                Positioned(
-                  top: 140,
-                  left: 80,
-                  child: _buildPin(0, 'Central Hub'),
-                ),
-                Positioned(
-                  top: 260,
-                  right: 90,
-                  child: _buildPin(1, 'Polanco Elite'),
-                ),
-                Positioned(
-                  bottom: 220,
-                  left: 120,
-                  child: _buildPin(2, 'Santa Fe'),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 16,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: AppColors.surface.withAlpha(240),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
               ),
-              child: const TextField(
-                style: TextStyle(color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Buscar gimnasio o zona...',
-                  hintStyle: TextStyle(color: AppColors.textMuted),
-                  icon: Icon(Icons.search, color: AppColors.primary),
-                  border: InputBorder.none,
+              Positioned(
+                right: 16,
+                bottom: 220,
+                child: Column(
+                  children: [
+                    FloatingActionButton.small(
+                      heroTag: 'gym_zoom_in',
+                      backgroundColor: AppColors.surface,
+                      foregroundColor: AppColors.textPrimary,
+                      onPressed: () {
+                        final z = _mapController.camera.zoom;
+                        _mapController.move(
+                          _gyms[_selectedGymIndex.value]['location'] as LatLng,
+                          z + 1,
+                        );
+                      },
+                      child: const Icon(Icons.add),
+                    ),
+                    const SizedBox(height: 8),
+                    FloatingActionButton.small(
+                      heroTag: 'gym_zoom_out',
+                      backgroundColor: AppColors.surface,
+                      foregroundColor: AppColors.textPrimary,
+                      onPressed: () {
+                        final z = _mapController.camera.zoom;
+                        _mapController.move(
+                          _gyms[_selectedGymIndex.value]['location'] as LatLng,
+                          z - 1,
+                        );
+                      },
+                      child: const Icon(Icons.remove),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            bottom: 20,
-            left: 20,
-            right: 20,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GymLocationCard(
-                  name: _gyms[_selectedGymIndex]['name']!,
-                  address: _gyms[_selectedGymIndex]['address']!,
-                  distance: _gyms[_selectedGymIndex]['distance']!,
-                  schedule: _gyms[_selectedGymIndex]['schedule']!,
-                  phone: _gyms[_selectedGymIndex]['phone']!,
-                  onDirections: () {},
+              Positioned(
+                bottom: 20,
+                left: 20,
+                right: 20,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GymLocationCard(
+                      name: _gyms[selectedIndex]['name']!.toString(),
+                      address: _gyms[selectedIndex]['address']!.toString(),
+                      distance: _gyms[selectedIndex]['distance']!.toString(),
+                      schedule: _gyms[selectedIndex]['schedule']!.toString(),
+                      phone: _gyms[selectedIndex]['phone']!.toString(),
+                      onDirections: () {},
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
-
-  Widget _buildPin(int index, String label) {
-    final isSelected = _selectedGymIndex == index;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedGymIndex = index;
-        });
-      },
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? AppColors.onPrimary : AppColors.textPrimary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Icon(
-            Icons.location_on_rounded,
-            size: isSelected ? 42 : 32,
-            color: isSelected ? AppColors.primary : Colors.white70,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final roadPaint = Paint()
-      ..color = const Color(0xFF26303B)
-      ..strokeWidth = 3;
-
-    final primaryRoadPaint = Paint()
-      ..color = const Color(0xFF33404F)
-      ..strokeWidth = 8;
-
-    canvas.drawLine(Offset(0, size.height * 0.35), Offset(size.width, size.height * 0.45), primaryRoadPaint);
-    canvas.drawLine(Offset(size.width * 0.25, 0), Offset(size.width * 0.3, size.height), primaryRoadPaint);
-    canvas.drawLine(Offset(0, size.height * 0.7), Offset(size.width, size.height * 0.65), roadPaint);
-    canvas.drawLine(Offset(size.width * 0.75, 0), Offset(size.width * 0.7, size.height), roadPaint);
-    canvas.drawLine(Offset(0, size.height * 0.15), Offset(size.width, size.height * 0.2), roadPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

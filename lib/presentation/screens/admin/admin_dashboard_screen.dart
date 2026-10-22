@@ -1,20 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
 import 'package:fitbase/config/navigation/custom_navigator.dart';
+import 'package:fitbase/presentation/providers/auth_provider.dart';
+import 'package:fitbase/presentation/providers/owner_provider.dart';
 import 'package:fitbase/presentation/widgets/metric_summary_card.dart';
 import 'package:fitbase/presentation/screens/admin/admin_subscribers_screen.dart';
+import 'package:fitbase/presentation/screens/admin/admin_managers_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_plans_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_payments_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_gym_edit_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_settings_screen.dart';
+import 'package:fitbase/presentation/screens/admin/admin_profile_screen.dart';
+import 'package:fitbase/presentation/screens/manger/manager_profile_screen.dart';
 
-class AdminDashboardScreen extends StatelessWidget {
+class AdminDashboardScreen extends ConsumerWidget {
   final Function(int)? onNavigateTab;
 
   const AdminDashboardScreen({super.key, this.onNavigateTab});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authUser = ref.watch(authProvider).value?.authData;
+    final owner = ref.watch(ownerProvider).value;
+
+    void navigateToProfile() {
+      if (authUser?.roleId == 2) {
+        CustomNavigator.pushFade(context, const AdminProfileScreen());
+      } else {
+        CustomNavigator.pushFade(context, const ManagerProfileScreen());
+      }
+    }
+
+    final title = (owner != null && owner.firstName.isNotEmpty)
+        ? 'Hola, ${owner.firstName}'
+        : (authUser?.roleId == 2
+            ? 'Panel de Propietario'
+            : 'Panel de Encargado');
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -31,54 +54,69 @@ class AdminDashboardScreen extends StatelessWidget {
             final gridRatio = isTablet || isLandscape ? 1.3 : 1.05;
 
             return ListView(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: 16,
+              ),
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceLight,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.primary, width: 2),
-                            ),
-                            child: const Icon(Icons.admin_panel_settings, color: AppColors.primary),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Panel de Administración',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
-                                  ),
+                      child: GestureDetector(
+                        onTap: navigateToProfile,
+                        behavior: HitTestBehavior.opaque,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceLight,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.primary,
+                                  width: 2,
                                 ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Fitbase Central Hub • En Vivo',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                              ),
+                              child: Icon(
+                                authUser?.roleId == 2
+                                    ? Icons.business_center_rounded
+                                    : Icons.manage_accounts_rounded,
+                                color: AppColors.primary,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    authUser?.email ?? 'Fitbase Hub • En Vivo',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -89,9 +127,30 @@ class AdminDashboardScreen extends StatelessWidget {
                         border: Border.all(color: AppColors.border),
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.settings_outlined, color: AppColors.textPrimary),
+                        icon: const Icon(
+                          Icons.person_outline_rounded,
+                          color: AppColors.textPrimary,
+                        ),
+                        onPressed: navigateToProfile,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.settings_outlined,
+                          color: AppColors.textPrimary,
+                        ),
                         onPressed: () {
-                          CustomNavigator.pushFade(context, const AdminSettingsScreen());
+                          CustomNavigator.pushFade(
+                            context,
+                            const AdminSettingsScreen(),
+                          );
                         },
                       ),
                     ),
@@ -142,40 +201,67 @@ class AdminDashboardScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    _buildActionItem(
-                      icon: Icons.group_outlined,
-                      label: 'Suscriptores',
-                      onTap: () {
-                        CustomNavigator.pushFade(context, const AdminSubscribersScreen(isModal: true));
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    _buildActionItem(
-                      icon: Icons.layers_outlined,
-                      label: 'Planes',
-                      onTap: () {
-                        CustomNavigator.pushFade(context, const AdminPlansScreen(isModal: true));
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    _buildActionItem(
-                      icon: Icons.payments_outlined,
-                      label: 'Pagos',
-                      onTap: () {
-                        CustomNavigator.pushFade(context, const AdminPaymentsScreen(isModal: true));
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    _buildActionItem(
-                      icon: Icons.edit_location_alt_outlined,
-                      label: 'Sede Gym',
-                      onTap: () {
-                        CustomNavigator.pushFade(context, const AdminGymEditScreen(isModal: true));
-                      },
-                    ),
-                  ],
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      _buildActionItem(
+                        icon: Icons.group_outlined,
+                        label: 'Socios',
+                        onTap: () {
+                          CustomNavigator.pushFade(
+                            context,
+                            const AdminSubscribersScreen(isModal: true),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      _buildActionItem(
+                        icon: Icons.badge_outlined,
+                        label: 'Staff',
+                        onTap: () {
+                          CustomNavigator.pushFade(
+                            context,
+                            const AdminManagersScreen(isModal: true),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      _buildActionItem(
+                        icon: Icons.layers_outlined,
+                        label: 'Planes',
+                        onTap: () {
+                          CustomNavigator.pushFade(
+                            context,
+                            const AdminPlansScreen(isModal: true),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      _buildActionItem(
+                        icon: Icons.payments_outlined,
+                        label: 'Pagos',
+                        onTap: () {
+                          CustomNavigator.pushFade(
+                            context,
+                            const AdminPaymentsScreen(isModal: true),
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      _buildActionItem(
+                        icon: Icons.edit_location_alt_outlined,
+                        label: 'Sede Gym',
+                        onTap: () {
+                          CustomNavigator.pushFade(
+                            context,
+                            const AdminGymEditScreen(isModal: true),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 28),
                 Row(
@@ -195,20 +281,47 @@ class AdminDashboardScreen extends StatelessWidget {
                     ),
                     TextButton(
                       onPressed: () {
-                        CustomNavigator.pushFade(context, const AdminPaymentsScreen(isModal: true));
+                        CustomNavigator.pushFade(
+                          context,
+                          const AdminPaymentsScreen(isModal: true),
+                        );
                       },
                       child: const Text(
                         'Ver todos',
-                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                _buildActivityItem('Carlos Mendoza', 'Renovó Plan Black Pro', '+\$499', 'Hace 10 min'),
-                _buildActivityItem('Lucía Morales', 'Nuevo Registro Plan Anual VIP', '+\$4,990', 'Hace 45 min'),
-                _buildActivityItem('Rodrigo Sánchez', 'Acceso registrado en torniquete', 'Check-in', 'Hace 1 hora'),
-                _buildActivityItem('Valeria Gómez', 'Pago de membresía en mostrador', '+\$499', 'Hace 2 horas'),
+                _buildActivityItem(
+                  'Carlos Mendoza',
+                  'Renovó Plan Black Pro',
+                  '+\$499',
+                  'Hace 10 min',
+                ),
+                _buildActivityItem(
+                  'Lucía Morales',
+                  'Nuevo Registro Plan Anual VIP',
+                  '+\$4,990',
+                  'Hace 45 min',
+                ),
+                _buildActivityItem(
+                  'Rodrigo Sánchez',
+                  'Acceso registrado en torniquete',
+                  'Check-in',
+                  'Hace 1 hora',
+                ),
+                _buildActivityItem(
+                  'Valeria Gómez',
+                  'Pago de membresía en mostrador',
+                  '+\$499',
+                  'Hace 2 horas',
+                ),
                 const SizedBox(height: 24),
               ],
             );
@@ -223,43 +336,47 @@ class AdminDashboardScreen extends StatelessWidget {
     required String label,
     required VoidCallback onTap,
   }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: AppColors.primary, size: 20),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 86,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: const BoxDecoration(
+                color: AppColors.surfaceLight,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildActivityItem(String name, String action, String amount, String time) {
+  Widget _buildActivityItem(
+    String name,
+    String action,
+    String amount,
+    String time,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -284,7 +401,10 @@ class AdminDashboardScreen extends StatelessWidget {
                   child: Center(
                     child: Text(
                       name.substring(0, 1),
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ),

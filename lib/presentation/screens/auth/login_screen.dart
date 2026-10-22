@@ -1,34 +1,89 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
 import 'package:fitbase/config/navigation/custom_navigator.dart';
+import 'package:fitbase/presentation/providers/auth_provider.dart';
 import 'package:fitbase/presentation/widgets/custom_button.dart';
 import 'package:fitbase/presentation/widgets/custom_text_field.dart';
-import 'package:fitbase/presentation/screens/admin/admin_main_screen.dart';
-import 'package:fitbase/presentation/screens/user/user_main_screen.dart';
 import 'package:fitbase/presentation/screens/guest/guest_home_screen.dart';
-import 'package:fitbase/presentation/screens/auth/register_screen.dart';
+import 'package:fitbase/presentation/screens/auth/forgot_password_screen.dart';
+import 'package:fitbase/presentation/screens/auth_gate.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController(text: 'carlos.fit@email.com');
-  final _passwordController = TextEditingController(text: '••••••••');
-  bool _obscurePassword = true;
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _obscurePassword = ValueNotifier<bool>(true);
+  final _loading = ValueNotifier<bool>(false);
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _obscurePassword.dispose();
+    _loading.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.error,
+          content: Text('Por favor, ingresa tu correo y contraseña.'),
+        ),
+      );
+      return;
+    }
+
+    _loading.value = true;
+
+    try {
+      final res = await ref.read(authProvider.notifier).login(email, password);
+      if (mounted) {
+        if (res['status'] == 'PENDING_2FA') {
+          _loading.value = false;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppColors.primary,
+              content: Text('Se requiere verificación de dos factores (2FA).'),
+            ),
+          );
+          return;
+        }
+        CustomNavigator.pushAndRemoveUntilFade(context, const AuthGate());
+      }
+    } catch (e) {
+      if (mounted) {
+        _loading.value = false;
+        final authState = ref.read(authProvider).value;
+        final msg = authState?.alertMessage.msg ?? e.toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text(msg.isNotEmpty ? msg : 'Error al iniciar sesión'),
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider).value;
+    if (authState != null && authState.authenticated) {
+      return const AuthGate();
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -61,7 +116,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.surface,
                             borderRadius: BorderRadius.circular(22),
-                            border: Border.all(color: AppColors.primary, width: 2),
+                            border: Border.all(
+                              color: AppColors.primary,
+                              width: 2,
+                            ),
                           ),
                           child: const Icon(
                             Icons.fitness_center_rounded,
@@ -101,30 +159,41 @@ class _LoginScreenState extends State<LoginScreen> {
                         prefixIcon: Icons.email_outlined,
                       ),
                       const SizedBox(height: 16),
-                      CustomTextField(
-                        label: 'Contraseña',
-                        controller: _passwordController,
-                        hintText: '••••••••',
-                        obscureText: _obscurePassword,
-                        prefixIcon: Icons.lock_outline_rounded,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                            color: AppColors.textSecondary,
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _obscurePassword,
+                        builder: (context, obscure, _) {
+                          return CustomTextField(
+                            label: 'Contraseña',
+                            controller: _passwordController,
+                            hintText: '••••••••',
+                            obscureText: obscure,
+                            prefixIcon: Icons.lock_outline_rounded,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                obscure
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                                color: AppColors.textSecondary,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                _obscurePassword.value =
+                                    !_obscurePassword.value;
+                              },
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            CustomNavigator.pushFade(
+                              context,
+                              const ForgotPasswordScreen(),
+                            );
+                          },
                           child: const Text(
                             '¿Olvidaste tu contraseña?',
                             style: TextStyle(
@@ -135,30 +204,32 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      CustomButton(
-                        text: 'Ingresar como Usuario',
-                        icon: Icons.person_rounded,
-                        onPressed: () {
-                          CustomNavigator.pushFade(context, const UserMainScreen());
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      CustomButton(
-                        text: 'Ingresar como Admin',
-                        isSecondary: true,
-                        icon: Icons.admin_panel_settings_rounded,
-                        onPressed: () {
-                          CustomNavigator.pushFade(context, const AdminMainScreen());
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _loading,
+                        builder: (context, loading, _) {
+                          return CustomButton(
+                            text: loading
+                                ? 'Iniciando sesión...'
+                                : 'Iniciar Sesión',
+                            icon: loading ? null : Icons.login_rounded,
+                            onPressed: loading ? () {} : _handleLogin,
+                          );
                         },
                       ),
                       const SizedBox(height: 20),
                       Center(
                         child: GestureDetector(
                           onTap: () {
-                            CustomNavigator.pushFade(context, const GuestHomeScreen());
+                            CustomNavigator.pushFade(
+                              context,
+                              const GuestHomeScreen(),
+                            );
                           },
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             child: const Text(
                               'Entrar como invitado',
                               style: TextStyle(
@@ -171,30 +242,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 28),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          const Text(
-                            '¿No tienes cuenta? ',
-                            style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              CustomNavigator.pushFade(context, const RegisterScreen());
-                            },
-                            child: const Text(
-                              'Regístrate aquí',
-                              style: TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
