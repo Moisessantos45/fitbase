@@ -48,3 +48,7 @@ app.*.map.json
 env.dev.json
 ui/
 requeriments.txt
+
+docs/features
+
+.agents
