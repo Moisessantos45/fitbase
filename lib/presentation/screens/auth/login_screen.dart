@@ -21,6 +21,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   final _obscurePassword = ValueNotifier<bool>(true);
   final _loading = ValueNotifier<bool>(false);
+  final _isEmailNotVerified = ValueNotifier<bool>(false);
+  final _resendingEmail = ValueNotifier<bool>(false);
 
   @override
   void dispose() {
@@ -28,6 +30,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _passwordController.dispose();
     _obscurePassword.dispose();
     _loading.dispose();
+    _isEmailNotVerified.dispose();
+    _resendingEmail.dispose();
     super.dispose();
   }
 
@@ -46,6 +50,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     _loading.value = true;
+    _isEmailNotVerified.value = false;
 
     try {
       final res = await ref.read(authProvider.notifier).login(email, password);
@@ -66,14 +71,67 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         _loading.value = false;
         final authState = ref.read(authProvider).value;
-        final msg = authState?.alertMessage.msg ?? e.toString();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: AppColors.error,
-            content: Text(msg.isNotEmpty ? msg : 'Error al iniciar sesión'),
-          ),
-        );
+        final isNotVerified =
+            authState?.accountNotVerified == true ||
+            authState?.alertMessage.msg == 'EMAIL_NOT_VERIFIED' ||
+            e.toString().contains('EMAIL_NOT_VERIFIED');
+
+        if (isNotVerified) {
+          _isEmailNotVerified.value = true;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: AppColors.error,
+              content: Text(
+                'Tu cuenta aún no ha sido verificada. Revisa tu correo o solicita un reenvío.',
+              ),
+            ),
+          );
+        } else {
+          final msg = authState?.alertMessage.msg ?? e.toString();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.error,
+              content: Text(msg.isNotEmpty ? msg : 'Error al iniciar sesión'),
+            ),
+          );
+        }
       }
+    }
+  }
+
+  Future<void> _handleResendVerification() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.error,
+          content: Text('Por favor, ingresa tu correo electrónico.'),
+        ),
+      );
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    _resendingEmail.value = true;
+
+    try {
+      await ref.read(authProvider.notifier).forwardEmailVerification(email);
+      final alert = ref.read(authProvider).value?.alertMessage;
+      final isError = alert?.error ?? false;
+      final msg = alert?.msg ?? 'Correo de verificación reenviado.';
+
+      messenger.showSnackBar(
+        SnackBar(
+          backgroundColor: isError ? AppColors.error : AppColors.success,
+          content: Text(msg),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.error, content: Text(e.toString())),
+      );
+    } finally {
+      _resendingEmail.value = false;
     }
   }
 
@@ -213,6 +271,105 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 : 'Iniciar Sesión',
                             icon: loading ? null : Icons.login_rounded,
                             onPressed: loading ? () {} : _handleLogin,
+                          );
+                        },
+                      ),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _isEmailNotVerified,
+                        builder: (context, notVerified, _) {
+                          if (!notVerified) return const SizedBox.shrink();
+
+                          return Container(
+                            margin: const EdgeInsets.only(top: 16),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppColors.error.withAlpha(120),
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const Row(
+                                  children: [
+                                    Icon(
+                                      Icons.mark_email_unread_outlined,
+                                      color: AppColors.error,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Correo no verificado',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Tu cuenta no ha sido activada. Pulsa el botón para recibir un nuevo enlace de confirmación.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: _resendingEmail,
+                                  builder: (context, resending, _) {
+                                    return OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.primary,
+                                        side: const BorderSide(
+                                          color: AppColors.primary,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                      onPressed: resending
+                                          ? null
+                                          : _handleResendVerification,
+                                      icon: resending
+                                          ? const SizedBox(
+                                              width: 16,
+                                              height: 16,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: AppColors.primary,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.send_rounded,
+                                              size: 16,
+                                            ),
+                                      label: Text(
+                                        resending
+                                            ? 'Reenviando correo...'
+                                            : 'Reenviar correo de verificación',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),
