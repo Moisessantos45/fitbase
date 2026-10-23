@@ -15,7 +15,7 @@ class UserNotifier extends AsyncNotifier<UserProfile> {
   Future<UserProfile> getUser() async {
     state = const AsyncLoading();
     try {
-      final res = await apiAuth.get('/user/me');
+      final res = await apiAuth.get('/users/me');
       final resMap = UserMapper.toSafeMap(res.data);
       final dataMap = UserMapper.toNullableMap(resMap['data']);
       if (dataMap == null) {
@@ -38,7 +38,7 @@ class UserNotifier extends AsyncNotifier<UserProfile> {
   }) async {
     state = const AsyncLoading();
     try {
-      final res = await apiAuth.post('/user', data: {
+      final res = await apiAuth.post('/users', data: {
         'first_name': firstName,
         'last_name': lastName,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
@@ -67,7 +67,7 @@ class UserNotifier extends AsyncNotifier<UserProfile> {
   }) async {
     state = const AsyncLoading();
     try {
-      final res = await apiAuth.put('/user/me', data: {
+      final res = await apiAuth.put('/users/me', data: {
         'first_name': firstName,
         'last_name': lastName,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
@@ -91,7 +91,7 @@ class UserNotifier extends AsyncNotifier<UserProfile> {
         'image': await MultipartFile.fromFile(filePath, filename: fileName),
       });
 
-      final res = await apiAuth.post('/user/me/upload-avatar', data: formData);
+      final res = await apiAuth.post('/users/me/upload-avatar', data: formData);
       final resMap = UserMapper.toSafeMap(res.data);
       final message = resMap['message']?.toString() ?? 'Avatar actualizado exitosamente';
       await getUser();
