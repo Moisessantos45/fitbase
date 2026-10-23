@@ -9,6 +9,8 @@ import 'package:fitbase/presentation/widgets/custom_text_field.dart';
 import 'package:fitbase/presentation/screens/admin/admin_settings_screen.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:fitbase/presentation/screens/common/map_picker_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:fitbase/presentation/widgets/image_source_sheet.dart';
 
 class AdminGymEditScreen extends ConsumerStatefulWidget {
   final bool isModal;
@@ -28,6 +30,8 @@ class _AdminGymEditScreenState extends ConsumerState<AdminGymEditScreen> {
   final _lngController = TextEditingController();
 
   final _loading = ValueNotifier<bool>(false);
+  final _uploadingCover = ValueNotifier<bool>(false);
+  final _uploadingPhotos = ValueNotifier<bool>(false);
   int _lastLoadedGymId = 0;
 
   @override
@@ -47,7 +51,70 @@ class _AdminGymEditScreenState extends ConsumerState<AdminGymEditScreen> {
     _latController.dispose();
     _lngController.dispose();
     _loading.dispose();
+    _uploadingCover.dispose();
+    _uploadingPhotos.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadCover(int gymId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final source = await ImageSourceSheet.show(context);
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 1600,
+      maxHeight: 1200,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    _uploadingCover.value = true;
+    try {
+      final msg = await ref
+          .read(gymProvider.notifier)
+          .uploadCover(gymId: gymId, filePath: picked.path);
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.success, content: Text(msg)),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.error, content: Text(e.toString())),
+      );
+    } finally {
+      _uploadingCover.value = false;
+    }
+  }
+
+  Future<void> _pickAndUploadPhotos(int gymId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final picker = ImagePicker();
+    final List<XFile> pickedList = await picker.pickMultiImage(
+      maxWidth: 1600,
+      maxHeight: 1200,
+      imageQuality: 85,
+    );
+    if (pickedList.isEmpty) return;
+
+    _uploadingPhotos.value = true;
+    try {
+      final msg = await ref
+          .read(gymProvider.notifier)
+          .uploadPhotos(
+            gymId: gymId,
+            filePaths: pickedList.map((f) => f.path).toList(),
+          );
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.success, content: Text(msg)),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.error, content: Text(e.toString())),
+      );
+    } finally {
+      _uploadingPhotos.value = false;
+    }
   }
 
   void _syncControllers(GymModel gym) {
@@ -626,42 +693,152 @@ class _AdminGymEditScreenState extends ConsumerState<AdminGymEditScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (gym.backgroundUrl.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: Container(
-                      height: 160,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        image: DecorationImage(
-                          image: NetworkImage(gym.backgroundUrl),
-                          fit: BoxFit.cover,
+                ValueListenableBuilder<bool>(
+                  valueListenable: _uploadingCover,
+                  builder: (context, uploadingCover, _) {
+                    if (gym.backgroundUrl.isNotEmpty) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Stack(
+                          children: [
+                            Container(
+                              height: 160,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                image: DecorationImage(
+                                  image: NetworkImage(gym.backgroundUrl),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Colors.black.withAlpha(180),
+                                    ],
+                                  ),
+                                ),
+                                padding: const EdgeInsets.all(16),
+                                alignment: Alignment.bottomLeft,
+                                child: Text(
+                                  gym.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: Material(
+                                color: Colors.black54,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: uploadingCover
+                                      ? null
+                                      : () => _pickAndUploadCover(gym.id),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    child: uploadingCover
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.camera_alt_outlined,
+                                                color: Colors.white,
+                                                size: 16,
+                                              ),
+                                              SizedBox(width: 6),
+                                              Text(
+                                                'Cambiar Portada',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return Material(
+                      color: AppColors.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        side: const BorderSide(color: AppColors.border),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: uploadingCover
+                            ? null
+                            : () => _pickAndUploadCover(gym.id),
+                        child: Container(
+                          height: 120,
+                          width: double.infinity,
+                          alignment: Alignment.center,
+                          child: uploadingCover
+                              ? const CircularProgressIndicator(
+                                  color: AppColors.primary,
+                                )
+                              : const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_photo_alternate_outlined,
+                                      size: 36,
+                                      color: AppColors.primary,
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Subir Foto de Portada',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Formatos JPG, PNG o WebP',
+                                      style: TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withAlpha(180),
-                            ],
-                          ),
-                        ),
-                        padding: const EdgeInsets.all(16),
-                        alignment: Alignment.bottomLeft,
-                        child: Text(
-                          gym.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -809,9 +986,11 @@ class _AdminGymEditScreenState extends ConsumerState<AdminGymEditScreen> {
                     borderRadius: BorderRadius.circular(16),
                     onTap: () async {
                       final lat =
-                          double.tryParse(_latController.text.trim()) ?? 19.4194;
+                          double.tryParse(_latController.text.trim()) ??
+                          19.4194;
                       final lng =
-                          double.tryParse(_lngController.text.trim()) ?? -99.1622;
+                          double.tryParse(_lngController.text.trim()) ??
+                          -99.1622;
                       final picked = await CustomNavigator.pushFade<LatLng>(
                         context,
                         MapPickerScreen(
@@ -821,8 +1000,12 @@ class _AdminGymEditScreenState extends ConsumerState<AdminGymEditScreen> {
                         ),
                       );
                       if (picked != null) {
-                        _latController.text = picked.latitude.toStringAsFixed(6);
-                        _lngController.text = picked.longitude.toStringAsFixed(6);
+                        _latController.text = picked.latitude.toStringAsFixed(
+                          6,
+                        );
+                        _lngController.text = picked.longitude.toStringAsFixed(
+                          6,
+                        );
                       }
                     },
                     child: Padding(
@@ -954,26 +1137,101 @@ class _AdminGymEditScreenState extends ConsumerState<AdminGymEditScreen> {
                     },
                   ),
                 ),
-                if (gym.photos.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Galería de Fotos',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Galería de Fotos',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _uploadingPhotos,
+                      builder: (context, uploading, _) {
+                        return TextButton.icon(
+                          onPressed: uploading
+                              ? null
+                              : () => _pickAndUploadPhotos(gym.id),
+                          icon: uploading
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.primary,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.add_photo_alternate_rounded,
+                                  size: 18,
+                                  color: AppColors.primary,
+                                ),
+                          label: Text(
+                            uploading ? 'Subiendo...' : 'Añadir Fotos',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (gym.photos.isNotEmpty)
                   SizedBox(
                     height: 110,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: gym.photos.length,
+                      itemCount: gym.photos.length + 1,
                       separatorBuilder: (context, index) =>
                           const SizedBox(width: 10),
                       itemBuilder: (context, index) {
-                        final photo = gym.photos[index];
+                        if (index == 0) {
+                          return Material(
+                            color: AppColors.surface,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: AppColors.border),
+                            ),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _pickAndUploadPhotos(gym.id),
+                              child: Container(
+                                width: 100,
+                                height: 110,
+                                alignment: Alignment.center,
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_circle_outline_rounded,
+                                      color: AppColors.primary,
+                                      size: 28,
+                                    ),
+                                    SizedBox(height: 6),
+                                    Text(
+                                      'Añadir Más',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        final photo = gym.photos[index - 1];
                         return Stack(
                           children: [
                             ClipRRect(
@@ -1043,8 +1301,49 @@ class _AdminGymEditScreenState extends ConsumerState<AdminGymEditScreen> {
                         );
                       },
                     ),
+                  )
+                else
+                  Material(
+                    color: AppColors.surface,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _pickAndUploadPhotos(gym.id),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        width: double.infinity,
+                        child: const Column(
+                          children: [
+                            Icon(
+                              Icons.photo_library_outlined,
+                              size: 36,
+                              color: AppColors.primary,
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Aún no has agregado fotos de tus instalaciones',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Toca aquí para seleccionar una o varias fotos de la galería',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ],
                 const SizedBox(height: 28),
                 ValueListenableBuilder<bool>(
                   valueListenable: _loading,

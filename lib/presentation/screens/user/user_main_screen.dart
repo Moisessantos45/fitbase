@@ -68,7 +68,7 @@ class _UserMainScreenState extends ConsumerState<UserMainScreen> {
           ),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -98,7 +98,7 @@ class _UserMainScreenState extends ConsumerState<UserMainScreen> {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
@@ -108,7 +108,7 @@ class _UserMainScreenState extends ConsumerState<UserMainScreen> {
           children: [
             Icon(
               icon,
-              size: 22,
+              size: 23,
               color: isSelected ? AppColors.onPrimary : AppColors.textSecondary,
             ),
             if (isSelected) ...[

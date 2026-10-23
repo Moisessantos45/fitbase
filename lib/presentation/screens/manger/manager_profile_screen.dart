@@ -7,6 +7,8 @@ import 'package:fitbase/presentation/screens/admin/admin_settings_screen.dart';
 import 'package:fitbase/presentation/screens/common/change_password_screen.dart';
 import 'package:fitbase/presentation/providers/auth_provider.dart';
 import 'package:fitbase/presentation/providers/manager_provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:fitbase/presentation/widgets/image_source_sheet.dart';
 
 class ManagerProfileScreen extends ConsumerStatefulWidget {
   const ManagerProfileScreen({super.key});
@@ -17,12 +19,51 @@ class ManagerProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ManagerProfileScreenState extends ConsumerState<ManagerProfileScreen> {
+  final _uploadingAvatar = ValueNotifier<bool>(false);
+
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
       ref.read(managerProvider.notifier).getManager();
     });
+  }
+
+  @override
+  void dispose() {
+    _uploadingAvatar.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final source = await ImageSourceSheet.show(context);
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    _uploadingAvatar.value = true;
+    try {
+      final msg = await ref
+          .read(managerProvider.notifier)
+          .uploadAvatar(picked.path);
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.success, content: Text(msg)),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.error, content: Text(e.toString())),
+      );
+    } finally {
+      _uploadingAvatar.value = false;
+    }
   }
 
   @override
@@ -69,49 +110,73 @@ class _ManagerProfileScreenState extends ConsumerState<ManagerProfileScreen> {
         child: Column(
           children: [
             Center(
-              child: Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLight,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary, width: 2.5),
-                    ),
-                    child: (managerMe != null && managerMe.avatarUrl.isNotEmpty)
-                        ? ClipOval(
-                            child: Image.network(
-                              managerMe.avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                Icons.manage_accounts_rounded,
-                                size: 55,
-                                color: AppColors.primary,
-                              ),
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _uploadingAvatar,
+                builder: (context, uploading, _) {
+                  return GestureDetector(
+                    onTap: uploading ? null : _pickAndUploadAvatar,
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary,
+                              width: 2.5,
                             ),
-                          )
-                        : const Icon(
-                            Icons.manage_accounts_rounded,
-                            size: 55,
-                            color: AppColors.primary,
                           ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+                          child: uploading
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 32,
+                                    height: 32,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                )
+                              : (managerMe != null &&
+                                    managerMe.avatarUrl.isNotEmpty)
+                              ? ClipOval(
+                                  child: Image.network(
+                                    managerMe.avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Icon(
+                                              Icons.manage_accounts_rounded,
+                                              size: 55,
+                                              color: AppColors.primary,
+                                            ),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.manage_accounts_rounded,
+                                  size: 55,
+                                  color: AppColors.primary,
+                                ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            size: 14,
+                            color: AppColors.onPrimary,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      size: 14,
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 16),
@@ -151,11 +216,7 @@ class _ManagerProfileScreenState extends ConsumerState<ManagerProfileScreen> {
             _buildInfoCard(
               title: 'Datos de Cuenta y Seguridad',
               children: [
-                _buildInfoRow(
-                  Icons.email_outlined,
-                  'Correo de Acceso',
-                  email,
-                ),
+                _buildInfoRow(Icons.email_outlined, 'Correo de Acceso', email),
                 _buildInfoRow(
                   Icons.badge_outlined,
                   'Rol Asignado',
@@ -221,10 +282,7 @@ class _ManagerProfileScreenState extends ConsumerState<ManagerProfileScreen> {
               text: 'Cambiar Contraseña',
               icon: Icons.lock_reset_rounded,
               onPressed: () {
-                CustomNavigator.pushFade(
-                  context,
-                  const ChangePasswordScreen(),
-                );
+                CustomNavigator.pushFade(context, const ChangePasswordScreen());
               },
             ),
             const SizedBox(height: 20),

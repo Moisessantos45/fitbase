@@ -8,6 +8,8 @@ import 'package:fitbase/presentation/screens/common/settings_screen.dart';
 import 'package:fitbase/presentation/screens/common/change_password_screen.dart';
 import 'package:fitbase/presentation/providers/auth_provider.dart';
 import 'package:fitbase/presentation/providers/user_provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:fitbase/presentation/widgets/image_source_sheet.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
   const UserProfileScreen({super.key});
@@ -17,6 +19,8 @@ class UserProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
+  final _uploadingAvatar = ValueNotifier<bool>(false);
+
   @override
   void initState() {
     super.initState();
@@ -25,12 +29,51 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _uploadingAvatar.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final source = await ImageSourceSheet.show(context);
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    _uploadingAvatar.value = true;
+    try {
+      final msg = await ref
+          .read(userProvider.notifier)
+          .uploadAvatar(picked.path);
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.success, content: Text(msg)),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(backgroundColor: AppColors.error, content: Text(e.toString())),
+      );
+    } finally {
+      _uploadingAvatar.value = false;
+    }
+  }
+
   void _showEditProfileDialog() {
     final user = ref.read(userProvider).value;
-    final firstNameController =
-        TextEditingController(text: user?.firstName ?? '');
-    final lastNameController =
-        TextEditingController(text: user?.lastName ?? '');
+    final firstNameController = TextEditingController(
+      text: user?.firstName ?? '',
+    );
+    final lastNameController = TextEditingController(
+      text: user?.lastName ?? '',
+    );
     final phoneController = TextEditingController(text: user?.phone ?? '');
     final dialogLoading = ValueNotifier<bool>(false);
 
@@ -104,7 +147,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             const SnackBar(
                               backgroundColor: AppColors.error,
                               content: Text(
-                                  'Por favor completa al menos nombre y apellido.'),
+                                'Por favor completa al menos nombre y apellido.',
+                              ),
                             ),
                           );
                           return;
@@ -159,7 +203,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final authUser = ref.watch(authProvider).value?.authData;
     final user = ref.watch(userProvider).value;
 
-    final fullName = (user != null &&
+    final fullName =
+        (user != null &&
             (user.firstName.isNotEmpty || user.lastName.isNotEmpty))
         ? '${user.firstName} ${user.lastName}'.trim()
         : 'Miembro Fitbase';
@@ -168,8 +213,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ? authUser!.email
         : 'usuario@fitbase.io';
 
-    final phone =
-        (user != null && user.phone.isNotEmpty) ? user.phone : 'No registrado';
+    final phone = (user != null && user.phone.isNotEmpty)
+        ? user.phone
+        : 'No registrado';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -207,49 +253,72 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         child: Column(
           children: [
             Center(
-              child: Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLight,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.primary, width: 2.5),
-                    ),
-                    child: (user != null && user.avatarUrl.isNotEmpty)
-                        ? ClipOval(
-                            child: Image.network(
-                              user.avatarUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                Icons.person,
-                                size: 60,
-                                color: AppColors.textPrimary,
-                              ),
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _uploadingAvatar,
+                builder: (context, uploading, _) {
+                  return GestureDetector(
+                    onTap: uploading ? null : _pickAndUploadAvatar,
+                    child: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceLight,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.primary,
+                              width: 2.5,
                             ),
-                          )
-                        : const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: AppColors.textPrimary,
                           ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
+                          child: uploading
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 32,
+                                    height: 32,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                )
+                              : (user != null && user.avatarUrl.isNotEmpty)
+                              ? ClipOval(
+                                  child: Image.network(
+                                    user.avatarUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            const Icon(
+                                              Icons.person,
+                                              size: 60,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.person,
+                                  size: 60,
+                                  color: AppColors.textPrimary,
+                                ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            size: 14,
+                            color: AppColors.onPrimary,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      size: 14,
-                      color: AppColors.onPrimary,
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 16),
@@ -299,11 +368,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   'Correo Electrónico',
                   email,
                 ),
-                _buildInfoRow(
-                  Icons.phone_outlined,
-                  'Teléfono',
-                  phone,
-                ),
+                _buildInfoRow(Icons.phone_outlined, 'Teléfono', phone),
                 _buildInfoRow(
                   Icons.security,
                   'Seguridad 2FA',
