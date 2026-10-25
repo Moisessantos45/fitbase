@@ -116,6 +116,7 @@ class GymModel {
   final double latitude;
   final double longitude;
   final bool isOpen;
+  final double distanceMeters;
   final List<GymScheduleItem> schedules;
   final List<GymPhotoItem> photos;
   final String createdAt;
@@ -133,6 +134,7 @@ class GymModel {
     this.latitude = 0.0,
     this.longitude = 0.0,
     this.isOpen = false,
+    this.distanceMeters = 0.0,
     this.schedules = const [],
     this.photos = const [],
     this.createdAt = '',
@@ -151,6 +153,7 @@ class GymModel {
     double? latitude,
     double? longitude,
     bool? isOpen,
+    double? distanceMeters,
     List<GymScheduleItem>? schedules,
     List<GymPhotoItem>? photos,
     String? createdAt,
@@ -168,6 +171,7 @@ class GymModel {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       isOpen: isOpen ?? this.isOpen,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
       schedules: schedules ?? this.schedules,
       photos: photos ?? this.photos,
       createdAt: createdAt ?? this.createdAt,

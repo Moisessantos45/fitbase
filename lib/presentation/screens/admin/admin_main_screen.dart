@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
-import 'package:fitbase/presentation/providers/auth_provider.dart';
-import 'package:fitbase/presentation/screens/auth_gate.dart';
 import 'package:fitbase/presentation/screens/admin/admin_dashboard_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_subscribers_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_managers_screen.dart';
@@ -43,14 +41,6 @@ class _AdminMainScreenState extends ConsumerState<AdminMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider).value;
-    if (authState == null || !authState.authenticated) {
-      return const AuthGate();
-    }
-    final roleId = authState.authData?.roleId ?? 0;
-    if (roleId != 2 && roleId != 3) {
-      return const AuthGate();
-    }
     return PopScope(
       canPop: _currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {

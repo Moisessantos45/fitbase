@@ -93,8 +93,8 @@ class AuthUser {
     );
   }
 
-  bool get isUser => roleId == 1;
+  bool get isUser => roleId == 4;
   bool get isOwner => roleId == 2;
   bool get isGymManager => roleId == 3;
-  bool get isAdmin => roleId == 4;
+  bool get isAdmin => roleId == 1;
 }

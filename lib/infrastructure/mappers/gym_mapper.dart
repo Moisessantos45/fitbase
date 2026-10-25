@@ -75,6 +75,8 @@ class GymMapper {
       longitude: double.tryParse(map['longitude']?.toString() ?? '') ?? 0.0,
       isOpen: map['is_open'] == true ||
           map['is_open']?.toString().toLowerCase() == 'true',
+      distanceMeters:
+          double.tryParse(map['distance_meters']?.toString() ?? '') ?? 0.0,
       schedules: schedulesList,
       photos: photosList,
       createdAt: map['created_at']?.toString() ?? '',

@@ -218,6 +218,18 @@ class GymNotifier extends AsyncNotifier<GymModel?> {
     }
   }
 
+  Future<GymModel?> getGymDetail(int id) async {
+    try {
+      final res = await apiPublic.get('/gyms/$id');
+      final resMap = GymMapper.toSafeMap(res.data);
+      final dataMap = GymMapper.toNullableMap(resMap['data']);
+      if (dataMap == null) return null;
+      return GymMapper.fromMap(dataMap);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<String> deletePhoto({
     required int gymId,
     required int photoId,
@@ -237,6 +249,68 @@ class GymNotifier extends AsyncNotifier<GymModel?> {
   }
 }
 
+class PublicGymsNotifier extends AsyncNotifier<List<GymModel>> {
+  @override
+  Future<List<GymModel>> build() async {
+    return fetchGyms();
+  }
+
+  Future<List<GymModel>> fetchGyms({
+    String? search,
+    double? lat,
+    double? lng,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final queryParams = <String, dynamic>{
+        'page': page,
+        'page_size': pageSize,
+      };
+      if (search != null && search.trim().isNotEmpty) {
+        queryParams['search'] = search.trim();
+      }
+      if (lat != null && lng != null) {
+        queryParams['lat'] = lat;
+        queryParams['lng'] = lng;
+      }
+
+      final res = await apiPublic.get('/gyms', queryParameters: queryParams);
+      final resMap = GymMapper.toSafeMap(res.data);
+      final dataObj = resMap['data'];
+      final List rawList;
+      if (dataObj is Map && dataObj['data'] is List) {
+        rawList = dataObj['data'] as List;
+      } else if (dataObj is List) {
+        rawList = dataObj;
+      } else {
+        rawList = const [];
+      }
+
+      final gyms = <GymModel>[];
+      for (final item in rawList) {
+        final itemMap = GymMapper.toNullableMap(item);
+        if (itemMap != null) {
+          gyms.add(GymMapper.fromMap(itemMap));
+        }
+      }
+
+      state = AsyncData(gyms);
+      return gyms;
+    } catch (e, stack) {
+      state = AsyncError(e, stack);
+      rethrow;
+    }
+  }
+}
+
 final gymProvider = AsyncNotifierProvider<GymNotifier, GymModel?>(
   GymNotifier.new,
 );
+
+final publicGymsProvider =
+    AsyncNotifierProvider<PublicGymsNotifier, List<GymModel>>(
+  PublicGymsNotifier.new,
+);
+

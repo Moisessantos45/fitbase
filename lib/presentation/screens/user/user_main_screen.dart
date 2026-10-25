@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
-import 'package:fitbase/presentation/providers/auth_provider.dart';
-import 'package:fitbase/presentation/screens/auth_gate.dart';
 import 'package:fitbase/presentation/screens/user/user_home_screen.dart';
 import 'package:fitbase/presentation/screens/user/user_plans_screen.dart';
 import 'package:fitbase/presentation/screens/user/user_payments_screen.dart';
@@ -41,14 +39,6 @@ class _UserMainScreenState extends ConsumerState<UserMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider).value;
-    if (authState == null || !authState.authenticated) {
-      return const AuthGate();
-    }
-    final roleId = authState.authData?.roleId ?? 0;
-    if (roleId != 1) {
-      return const AuthGate();
-    }
     return PopScope(
       canPop: _currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
