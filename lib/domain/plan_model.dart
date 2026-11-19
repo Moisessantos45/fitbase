@@ -50,7 +50,7 @@ class PlanModel {
     this.duration = 0,
     this.planType = '',
     this.maxVisits,
-    this.active = false,
+    this.active = true,
     this.isCurrent = false,
     this.items = const [],
   });
@@ -89,3 +89,66 @@ class PlanModel {
     );
   }
 }
+
+class ActiveSubscriptionInfo {
+  final int id;
+  final String slug;
+  final int planId;
+  final String planName;
+  final String startDate;
+  final String endDate;
+  final String statusName;
+  final bool autoRenew;
+
+  const ActiveSubscriptionInfo({
+    this.id = 0,
+    this.slug = '',
+    this.planId = 0,
+    this.planName = '',
+    this.startDate = '',
+    this.endDate = '',
+    this.statusName = '',
+    this.autoRenew = false,
+  });
+}
+
+class GymEnrollmentData {
+  final int gymId;
+  final String gymName;
+  final bool hasActiveSubscription;
+  final ActiveSubscriptionInfo? activeSubscription;
+  final List<PlanModel> plans;
+
+  const GymEnrollmentData({
+    this.gymId = 0,
+    this.gymName = '',
+    this.hasActiveSubscription = false,
+    this.activeSubscription,
+    this.plans = const [],
+  });
+}
+
+class CreatePlanPayload {
+  final int gymId;
+  final String name;
+  final String description;
+  final double price;
+  final double discount;
+  final int duration;
+  final String planType;
+  final int? maxVisits;
+  final List<PlanItemModel> items;
+
+  const CreatePlanPayload({
+    required this.gymId,
+    required this.name,
+    required this.description,
+    required this.price,
+    this.discount = 0.0,
+    required this.duration,
+    required this.planType,
+    this.maxVisits,
+    this.items = const [],
+  });
+}
+
