@@ -3,7 +3,7 @@ import 'package:fitbase/config/theme/app_colors.dart';
 
 class CustomButton extends StatelessWidget {
   final String text;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool isSecondary;
   final bool isOutlined;
   final IconData? icon;
@@ -13,7 +13,7 @@ class CustomButton extends StatelessWidget {
   const CustomButton({
     super.key,
     required this.text,
-    required this.onPressed,
+    this.onPressed,
     this.isSecondary = false,
     this.isOutlined = false,
     this.icon,
