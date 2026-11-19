@@ -313,4 +313,3 @@ final publicGymsProvider =
     AsyncNotifierProvider<PublicGymsNotifier, List<GymModel>>(
   PublicGymsNotifier.new,
 );
-
