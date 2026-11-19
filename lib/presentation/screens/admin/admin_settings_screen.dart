@@ -8,6 +8,8 @@ import 'package:fitbase/presentation/widgets/custom_button.dart';
 import 'package:fitbase/presentation/screens/admin/admin_managers_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_profile_screen.dart';
 import 'package:fitbase/presentation/screens/manger/manager_profile_screen.dart';
+import 'package:fitbase/presentation/providers/cash_register_provider.dart';
+import 'package:fitbase/presentation/widgets/manger/close_cash_dialog.dart';
 import 'package:fitbase/presentation/screens/common/change_password_screen.dart';
 import 'package:fitbase/presentation/screens/auth_gate.dart';
 
@@ -371,6 +373,22 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
               Navigator.of(ctx).pop();
+              final authUser = ref.read(authProvider).value?.authData;
+              if (authUser?.roleId == 3) {
+                final box = await ref.read(cashRegisterProvider.notifier).checkCurrent();
+                if (box != null && box.isOpen && context.mounted) {
+                  CloseCashDialog.show(
+                    context,
+                    onClosed: () async {
+                      await ref.read(authProvider.notifier).logout();
+                      if (context.mounted) {
+                        CustomNavigator.pushAndRemoveUntilFade(context, const AuthGate());
+                      }
+                    },
+                  );
+                  return;
+                }
+              }
               await ref.read(authProvider.notifier).logout();
               if (context.mounted) {
                 CustomNavigator.pushAndRemoveUntilFade(context, const AuthGate());
