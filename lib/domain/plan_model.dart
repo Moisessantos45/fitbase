@@ -1,0 +1,91 @@
+class PlanItemModel {
+  final int id;
+  final String name;
+  final String description;
+
+  const PlanItemModel({
+    this.id = 0,
+    this.name = '',
+    this.description = '',
+  });
+
+  PlanItemModel copyWith({
+    int? id,
+    String? name,
+    String? description,
+  }) {
+    return PlanItemModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+    );
+  }
+}
+
+class PlanModel {
+  final int id;
+  final int gymId;
+  final String gymName;
+  final String name;
+  final String description;
+  final double price;
+  final double discount;
+  final double finalPrice;
+  final int duration;
+  final String planType;
+  final int? maxVisits;
+  final bool active;
+  final bool isCurrent;
+  final List<PlanItemModel> items;
+
+  const PlanModel({
+    this.id = 0,
+    this.gymId = 0,
+    this.gymName = '',
+    this.name = '',
+    this.description = '',
+    this.price = 0.0,
+    this.discount = 0.0,
+    this.finalPrice = 0.0,
+    this.duration = 0,
+    this.planType = '',
+    this.maxVisits,
+    this.active = false,
+    this.isCurrent = false,
+    this.items = const [],
+  });
+
+  PlanModel copyWith({
+    int? id,
+    int? gymId,
+    String? gymName,
+    String? name,
+    String? description,
+    double? price,
+    double? discount,
+    double? finalPrice,
+    int? duration,
+    String? planType,
+    int? maxVisits,
+    bool? active,
+    bool? isCurrent,
+    List<PlanItemModel>? items,
+  }) {
+    return PlanModel(
+      id: id ?? this.id,
+      gymId: gymId ?? this.gymId,
+      gymName: gymName ?? this.gymName,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      price: price ?? this.price,
+      discount: discount ?? this.discount,
+      finalPrice: finalPrice ?? this.finalPrice,
+      duration: duration ?? this.duration,
+      planType: planType ?? this.planType,
+      maxVisits: maxVisits ?? this.maxVisits,
+      active: active ?? this.active,
+      isCurrent: isCurrent ?? this.isCurrent,
+      items: items ?? this.items,
+    );
+  }
+}
