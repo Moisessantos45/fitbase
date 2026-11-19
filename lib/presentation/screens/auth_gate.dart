@@ -6,6 +6,7 @@ import 'package:fitbase/presentation/providers/auth_provider.dart';
 import 'package:fitbase/presentation/screens/auth/login_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_main_screen.dart';
 import 'package:fitbase/presentation/screens/admin/admin_profile_screen.dart';
+import 'package:fitbase/presentation/screens/manger/manager_main_screen.dart';
 import 'package:fitbase/presentation/screens/manger/manager_profile_screen.dart';
 import 'package:fitbase/presentation/screens/user/user_main_screen.dart';
 import 'package:fitbase/presentation/screens/user/user_profile_screen.dart';
@@ -149,8 +150,11 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                   return const UserProfileScreen();
                 }
 
-                if (roleId == 2 || roleId == 3) {
+                if (roleId == 2) {
                   return const AdminMainScreen();
+                }
+                if (roleId == 3) {
+                  return const ManagerMainScreen();
                 }
 
                 return const UserMainScreen();
