@@ -4,6 +4,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
 import 'package:fitbase/domain/gym_model.dart';
 import 'package:fitbase/presentation/providers/gym_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:fitbase/presentation/providers/plan_provider.dart';
+import 'package:fitbase/presentation/screens/guest/guest_purchase_screen.dart';
+import 'package:fitbase/presentation/providers/auth_provider.dart';
+import 'package:fitbase/presentation/providers/payment_provider.dart';
+import 'package:fitbase/presentation/screens/guest/guest_ticket_screen.dart';
 
 class GymDetailModal extends ConsumerStatefulWidget {
   final GymModel initialGym;
@@ -280,6 +286,41 @@ class _GymDetailModalState extends ConsumerState<GymDetailModal> {
                           ? gym.address
                           : 'Dirección no disponible',
                     ),
+                    if (gym.latitude != 0 && gym.longitude != 0) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final url = Uri.parse(
+                              'https://www.google.com/maps/search/?api=1&query=${gym.latitude},${gym.longitude}',
+                            );
+                            try {
+                              await launchUrl(
+                                url,
+                                mode: LaunchMode.platformDefault,
+                                webOnlyWindowName: '_blank',
+                              );
+                            } catch (e) {
+                              debugPrint('Error al abrir el mapa: $e');
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.primary),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: const Icon(Icons.directions_rounded, size: 18),
+                          label: const Text(
+                            'Cómo llegar',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
                     if (gym.phone.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       _buildInfoRow(Icons.phone_outlined, gym.phone),
@@ -288,6 +329,214 @@ class _GymDetailModalState extends ConsumerState<GymDetailModal> {
                       const SizedBox(height: 8),
                       _buildInfoRow(Icons.email_outlined, gym.email),
                     ],
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Planes y Membresías',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final plansAsync = ref.watch(gymPlansProvider(gym.id));
+                        return plansAsync.when(
+                          loading: () => const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20),
+                              child: CircularProgressIndicator(color: AppColors.primary),
+                            ),
+                          ),
+                          error: (e, _) => const Text(
+                            'Error al cargar planes',
+                            style: TextStyle(color: AppColors.error),
+                          ),
+                          data: (plans) {
+                            if (plans.isEmpty) {
+                              return const Text(
+                                'No hay planes disponibles',
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                              );
+                            }
+                            return Column(
+                              children: plans.map((plan) {
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.background,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: plan.isCurrent ? AppColors.primary : AppColors.border,
+                                      width: plan.isCurrent ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              plan.name,
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                          if (plan.isCurrent)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary,
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: const Text(
+                                                'TU PLAN',
+                                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onPrimary),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        plan.description,
+                                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          if (plan.discount > 0) ...[
+                                            Text(
+                                              '\$${plan.price.toStringAsFixed(2)}',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: AppColors.textMuted,
+                                                decoration: TextDecoration.lineThrough,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                          ],
+                                          Text(
+                                            '\$${plan.finalPrice.toStringAsFixed(2)}',
+                                            style: const TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            plan.duration == 1 ? '/día' : (plan.duration == 365 ? '/año' : '/${plan.duration}d'),
+                                            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                          ),
+                                        ],
+                                      ),
+                                      if (plan.items.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        ...plan.items.map((item) => Padding(
+                                          padding: const EdgeInsets.only(bottom: 6),
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.primary),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  item.name,
+                                                  style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )),
+                                      ],
+                                      if (!plan.isCurrent) ...[
+                                        const SizedBox(height: 12),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton(
+                                            onPressed: () async {
+                                              final authState = ref.read(authProvider).value;
+                                              final isAuthenticated = authState != null && authState.authenticated;
+
+                                              if (plan.planType == 'Diario') {
+                                                if (isAuthenticated) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text('Simulando compra de pase para socio...'),
+                                                      backgroundColor: AppColors.primaryDark,
+                                                    ),
+                                                  );
+                                                  
+                                                  try {
+                                                    final ticket = await ref.read(paymentProvider.notifier).purchaseGuestDayPass(
+                                                      gymId: gym.id,
+                                                      planId: plan.id,
+                                                      fullName: 'Socio Fitbase',
+                                                      phone: '',
+                                                      email: '',
+                                                      visitDate: '2026-11-10',
+                                                      payWithStripe: false,
+                                                    );
+                                                    
+                                                    if (context.mounted) {
+                                                      Navigator.of(context).push(
+                                                        MaterialPageRoute(
+                                                          builder: (_) => GuestTicketScreen(
+                                                            slug: ticket.slug,
+                                                            fullName: ticket.fullName,
+                                                            visitDate: ticket.visitDate,
+                                                            isPaid: ticket.isPaid,
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+                                                  } catch (e) {
+                                                    debugPrint('Error al procesar la compra: $e');
+                                                  }
+                                                } else {
+                                                  Navigator.of(context).push(
+                                                    MaterialPageRoute(
+                                                      builder: (_) => GuestPurchaseScreen(
+                                                        plan: plan,
+                                                        gymId: gym.id,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }
+                                              } else {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('Adquirir membresía: ${plan.name}'),
+                                                    backgroundColor: AppColors.primaryDark,
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: AppColors.primary,
+                                              foregroundColor: AppColors.onPrimary,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                            child: Text(plan.planType == 'Diario' ? 'Comprar Pase' : 'Adquirir Membresía'),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        );
+                      },
+                    ),
                     const SizedBox(height: 24),
                     const Text(
                       'Horarios de Atención',

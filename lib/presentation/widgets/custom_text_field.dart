@@ -10,6 +10,7 @@ class CustomTextField extends StatelessWidget {
   final IconData? prefixIcon;
   final Widget? suffixIcon;
   final int maxLines;
+  final ValueChanged<String>? onChanged;
 
   const CustomTextField({
     super.key,
@@ -21,6 +22,7 @@ class CustomTextField extends StatelessWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.maxLines = 1,
+    this.onChanged,
   });
 
   @override
@@ -48,6 +50,7 @@ class CustomTextField extends StatelessWidget {
             obscureText: obscureText,
             keyboardType: keyboardType,
             maxLines: maxLines,
+            onChanged: onChanged,
             style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 15,

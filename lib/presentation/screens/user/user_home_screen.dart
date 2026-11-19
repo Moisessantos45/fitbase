@@ -5,6 +5,9 @@ import 'package:fitbase/presentation/screens/user/user_subscriptions_screen.dart
 import 'package:fitbase/presentation/screens/user/user_payments_screen.dart';
 import 'package:fitbase/presentation/screens/user/user_plans_screen.dart';
 import 'package:fitbase/presentation/screens/user/gym_map_screen.dart';
+import 'package:fitbase/presentation/screens/common/ticket_screen.dart';
+import 'package:fitbase/presentation/screens/user/user_attendance_screen.dart';
+
 
 class UserHomeScreen extends StatelessWidget {
   final Function(int)? onNavigateTab;
@@ -92,95 +95,111 @@ class UserHomeScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF222904), AppColors.surface],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TicketScreen(
+                      title: 'Carlos Mendoza',
+                      subtitle: 'Membresía Black Anual',
+                      slug: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+                      dateInfo: 'Vigencia: 01 Ene 2026 - 01 Ene 2027',
+                      isActive: true,
+                      isMembership: true,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF222904), AppColors.surface],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.primary.withAlpha(120)),
                 ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.primary.withAlpha(120)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Pase Digital de Acceso',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Pase Digital de Acceso',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'QR LISTO',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.onPrimary,
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'QR LISTO',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.onPrimary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.qr_code_2_rounded,
+                            size: 48,
+                            color: Colors.black,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.qr_code_2_rounded,
-                          size: 48,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Fitbase Central Hub',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Fitbase Central Hub',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Muestra este código al torniquete para ingresar.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
+                              SizedBox(height: 4),
+                              Text(
+                                'Muestra este código al torniquete para ingresar.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -249,7 +268,9 @@ class UserHomeScreen extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    CustomNavigator.pushFade(context, const UserAttendanceScreen(isModal: true));
+                  },
                   child: const Text(
                     'Ver todas',
                     style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
