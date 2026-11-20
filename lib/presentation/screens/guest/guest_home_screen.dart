@@ -12,7 +12,6 @@ import 'package:fitbase/presentation/providers/auth_provider.dart';
 import 'package:fitbase/presentation/providers/gym_provider.dart';
 import 'package:fitbase/presentation/screens/auth/register_screen.dart';
 import 'package:fitbase/presentation/screens/auth_gate.dart';
-import 'package:fitbase/presentation/widgets/plan_card.dart';
 import 'package:fitbase/presentation/widgets/common/gym_detail_modal.dart';
 
 class GuestHomeScreen extends ConsumerStatefulWidget {
@@ -22,9 +21,7 @@ class GuestHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<GuestHomeScreen> createState() => _GuestHomeScreenState();
 }
 
-class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen> {
   late final MapController _mapController;
   late final ScrollController _scrollController;
   final TextEditingController _searchController = TextEditingController();
@@ -38,7 +35,6 @@ class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _mapController = MapController();
     _scrollController = ScrollController();
 
@@ -55,7 +51,6 @@ class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen>
   @override
   void dispose() {
     _debounceTimer?.cancel();
-    _tabController.dispose();
     _mapController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
@@ -195,7 +190,7 @@ class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen>
               ),
             ),
             Text(
-              'Explora planes y sucursales',
+              'Explora sedes cercanas',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.primary,
@@ -219,84 +214,8 @@ class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen>
           ),
           const SizedBox(width: 8),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.primary,
-          indicatorWeight: 3,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-          tabs: const [
-            Tab(
-              text: 'Planes Disponibles',
-              icon: Icon(Icons.card_membership_rounded),
-            ),
-            Tab(
-              text: 'Ubicaciones',
-              icon: Icon(Icons.location_on_rounded),
-            ),
-          ],
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildPlansTab(),
-          _buildLocationsTab(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlansTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        PlanCard(
-          title: 'Plan Básico',
-          price: '\$299',
-          period: '/mes',
-          description: 'Acceso a área de pesas y cardio de lunes a viernes.',
-          benefits: const [
-            'Área de pesas y cardio libre',
-            'Vestidores y lockers estándar',
-            'Horario de 6:00 AM a 10:00 PM',
-          ],
-          onSelect: () => _goToRegister(),
-        ),
-        const SizedBox(height: 18),
-        PlanCard(
-          title: 'Plan Black Pro',
-          price: '\$499',
-          period: '/mes',
-          description:
-              'Acceso total e ilimitado a todas nuestras sedes y clases.',
-          isPopular: true,
-          benefits: const [
-            'Acceso ilimitado 24/7',
-            'Todas las sedes incluidas',
-            'Clases grupales (Spinning, Yoga, Cross)',
-            'Área de sauna y spa',
-            'Invitado gratis 1 vez por semana',
-          ],
-          onSelect: () => _goToRegister(),
-        ),
-        const SizedBox(height: 18),
-        PlanCard(
-          title: 'Plan Anual VIP',
-          price: '\$4,990',
-          period: '/año',
-          description: 'Ahorra 2 meses y recibe asesoría nutricional completa.',
-          benefits: const [
-            'Todos los beneficios Black Pro',
-            'Evaluación y plan nutricional mensual',
-            '2 sesiones de entrenador personal gratis',
-            'Kit de bienvenida Fitbase gratis',
-          ],
-          onSelect: () => _goToRegister(),
-        ),
-        const SizedBox(height: 30),
-      ],
+      body: _buildLocationsTab(),
     );
   }
 
@@ -909,9 +828,5 @@ class _GuestHomeScreenState extends ConsumerState<GuestHomeScreen>
         );
       },
     );
-  }
-
-  void _goToRegister() {
-    CustomNavigator.pushFade(context, const RegisterScreen());
   }
 }

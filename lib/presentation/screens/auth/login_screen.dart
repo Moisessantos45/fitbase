@@ -7,6 +7,7 @@ import 'package:fitbase/presentation/widgets/custom_button.dart';
 import 'package:fitbase/presentation/widgets/custom_text_field.dart';
 import 'package:fitbase/presentation/screens/guest/guest_home_screen.dart';
 import 'package:fitbase/presentation/screens/auth/forgot_password_screen.dart';
+import 'package:fitbase/presentation/screens/auth/register_screen.dart';
 import 'package:fitbase/presentation/screens/auth_gate.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -374,6 +375,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         },
                       ),
                       const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            '¿No tienes cuenta? ',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              CustomNavigator.pushFade(
+                                context,
+                                const RegisterScreen(),
+                              );
+                            },
+                            child: const Text(
+                              'Regístrate',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       Center(
                         child: GestureDetector(
                           onTap: () {

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
+import 'package:fitbase/presentation/providers/payment_provider.dart';
+import 'package:fitbase/presentation/providers/subscription_provider.dart';
 import 'package:fitbase/presentation/screens/user/user_home_screen.dart';
-import 'package:fitbase/presentation/screens/user/user_plans_screen.dart';
-import 'package:fitbase/presentation/screens/user/user_payments_screen.dart';
 import 'package:fitbase/presentation/screens/user/gym_map_screen.dart';
+import 'package:fitbase/presentation/screens/user/user_subscriptions_screen.dart';
+import 'package:fitbase/presentation/screens/user/user_payments_screen.dart';
 import 'package:fitbase/presentation/screens/common/profile_screen.dart';
 
 class UserMainScreen extends ConsumerStatefulWidget {
@@ -30,9 +32,9 @@ class _UserMainScreenState extends ConsumerState<UserMainScreen> {
           });
         },
       ),
-      const UserPlansScreen(),
-      const UserPaymentsScreen(),
       const GymMapScreen(),
+      const UserSubscriptionsScreen(),
+      const UserPaymentsScreen(),
       const ProfileScreen(roleName: 'Usuario'),
     ];
   }
@@ -63,9 +65,9 @@ class _UserMainScreenState extends ConsumerState<UserMainScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildNavItem(0, Icons.home_rounded, 'Inicio'),
-                  _buildNavItem(1, Icons.card_membership_rounded, 'Planes'),
-                  _buildNavItem(2, Icons.credit_card_rounded, 'Pagos'),
-                  _buildNavItem(3, Icons.map_rounded, 'Mapa'),
+                  _buildNavItem(1, Icons.map_rounded, 'Sedes'),
+                  _buildNavItem(2, Icons.card_membership_rounded, 'Membresías'),
+                  _buildNavItem(3, Icons.credit_card_rounded, 'Pagos'),
                   _buildNavItem(4, Icons.person_rounded, 'Perfil'),
                 ],
               ),
@@ -84,6 +86,11 @@ class _UserMainScreenState extends ConsumerState<UserMainScreen> {
         setState(() {
           _currentIndex = index;
         });
+        if (index == 2) {
+          ref.read(userSubscriptionsProvider.notifier).getMySubscriptions();
+        } else if (index == 3) {
+          ref.read(userPaymentsProvider.notifier).getMyPayments();
+        }
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(

@@ -14,33 +14,58 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
-  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _acceptTerms = ValueNotifier<bool>(true);
   final _loading = ValueNotifier<bool>(false);
+  final _isOwner = ValueNotifier<bool>(false);
+  final _obscurePassword = ValueNotifier<bool>(true);
+  final _obscureConfirm = ValueNotifier<bool>(true);
 
   @override
   void dispose() {
-    _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _acceptTerms.dispose();
     _loading.dispose();
+    _isOwner.dispose();
+    _obscurePassword.dispose();
+    _obscureConfirm.dispose();
     super.dispose();
   }
 
   Future<void> _handleRegister() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
+    if (email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           backgroundColor: AppColors.error,
           content: Text('Por favor completa todos los campos obligatorios.'),
+        ),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.error,
+          content: Text('La contraseña debe tener al menos 6 caracteres.'),
+        ),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.error,
+          content: Text('Las contraseñas no coinciden.'),
         ),
       );
       return;
@@ -59,7 +84,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _loading.value = true;
 
     try {
-      final msg = await ref.read(authProvider.notifier).register(email, password, false);
+      final msg = await ref
+          .read(authProvider.notifier)
+          .register(email, password, _isOwner.value);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -123,14 +150,131 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 'Únete a Fitbase y transforma tu estilo de vida',
                 style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               ),
-              const SizedBox(height: 28),
-              CustomTextField(
-                label: 'Nombre Completo',
-                controller: _nameController,
-                hintText: 'Tu nombre y apellido',
-                prefixIcon: Icons.person_outline_rounded,
+              const SizedBox(height: 22),
+              const Text(
+                'Tipo de Cuenta',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              ValueListenableBuilder<bool>(
+                valueListenable: _isOwner,
+                builder: (context, isOwner, _) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _isOwner.value = false,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 14, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: !isOwner
+                                  ? AppColors.primary.withValues(alpha: 0.12)
+                                  : AppColors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: !isOwner
+                                    ? AppColors.primary
+                                    : AppColors.border,
+                                width: !isOwner ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.person_rounded,
+                                  color: !isOwner
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                  size: 24,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Usuario',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: !isOwner
+                                        ? AppColors.primary
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'Entrena en sedes',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => _isOwner.value = true,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 14, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: isOwner
+                                  ? AppColors.primary.withValues(alpha: 0.12)
+                                  : AppColors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: isOwner
+                                    ? AppColors.primary
+                                    : AppColors.border,
+                                width: isOwner ? 2 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.storefront_rounded,
+                                  color: isOwner
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                  size: 24,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Dueño de Gym',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: isOwner
+                                        ? AppColors.primary
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'Administra tu sede',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
               CustomTextField(
                 label: 'Correo Electrónico *',
                 controller: _emailController,
@@ -139,20 +283,54 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 prefixIcon: Icons.mail_outline_rounded,
               ),
               const SizedBox(height: 16),
-              CustomTextField(
-                label: 'Teléfono',
-                controller: _phoneController,
-                hintText: '+52 55 1234 5678',
-                keyboardType: TextInputType.phone,
-                prefixIcon: Icons.phone_outlined,
+              ValueListenableBuilder<bool>(
+                valueListenable: _obscurePassword,
+                builder: (context, obscure, _) {
+                  return CustomTextField(
+                    label: 'Contraseña *',
+                    controller: _passwordController,
+                    hintText: 'Mínimo 6 caracteres',
+                    obscureText: obscure,
+                    prefixIcon: Icons.lock_outline_rounded,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscure
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        _obscurePassword.value = !_obscurePassword.value;
+                      },
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
-              CustomTextField(
-                label: 'Contraseña *',
-                controller: _passwordController,
-                hintText: 'Mínimo 6 caracteres',
-                obscureText: true,
-                prefixIcon: Icons.lock_outline_rounded,
+              ValueListenableBuilder<bool>(
+                valueListenable: _obscureConfirm,
+                builder: (context, obscure, _) {
+                  return CustomTextField(
+                    label: 'Confirmar Contraseña *',
+                    controller: _confirmPasswordController,
+                    hintText: 'Repite tu contraseña',
+                    obscureText: obscure,
+                    prefixIcon: Icons.lock_outline_rounded,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscure
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        _obscureConfirm.value = !_obscureConfirm.value;
+                      },
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               ValueListenableBuilder<bool>(
