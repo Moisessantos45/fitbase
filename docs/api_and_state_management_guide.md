@@ -1,296 +1,197 @@
 # Manual de Integración: Dio, Riverpod y Consumo de Endpoints en Fitbase
 
-Esta guía detalla el funcionamiento interno de la capa de red con **Dio**, la gestión de estado con **Riverpod (3.x)** y el paso a paso para implementar y consumir un nuevo endpoint desde cualquier pantalla (`Screen`) o widget del proyecto.
+Esta guía detalla la arquitectura de red con **Dio**, la gestión reactiva de estado con **Riverpod (3.x)**, el mapa completo de endpoints y el procedimiento para consumir y mutar datos desde cualquier pantalla (`Screen`) o widget del ecosistema **Fitbase**.
 
 ---
 
-## 1. Mapa de Archivos y Dónde Encontrar Cada Clase
+## Enlaces del Proyecto
+
+* **Descarga del APK (Android Release)**: [https://zurl.mmabitec.uk/nbQlPz](https://zurl.mmabitec.uk/nbQlPz)
+* **Repositorio del Backend (API REST)**: [https://github.com/Moisessantos45/fitbase_backend](https://github.com/Moisessantos45/fitbase_backend)
+* **Repositorio de la Aplicación Móvil**: [https://github.com/Moisessantos45/fitbase](https://github.com/Moisessantos45/fitbase)
+
+---
+
+## 1. Configuración y Cómo Hacer Funcionar el Proyecto
+
+### A. Variables de Entorno
+La aplicación utiliza `--dart-define-from-file` para alimentar la clase `Env` (`lib/config/env.dart`). Es necesario crear el archivo `env.dev.json` en la raíz del proyecto:
+
+```json
+{
+  "API_BASE_V1": "https://fitbase.mmabitec.uk/api/v1"
+}
+```
+
+### B. Comandos de Ejecución y Compilación
+```bash
+# 1. Instalar dependencias
+flutter pub get
+
+# 2. Ejecutar en modo desarrollo
+flutter run --dart-define-from-file=./env.dev.json
+
+# 3. Compilar APK para producción (con ofuscación y reglas R8)
+flutter build apk --release --dart-define-from-file=./env.dev.json --obfuscate --split-debug-info=build/app/outputs/symbols
+```
+
+---
+
+## 2. Mapa de Archivos y Responsabilidades
 
 | Componente | Ubicación en el Proyecto | Responsabilidad |
 | :--- | :--- | :--- |
-| **Variables de Entorno** | `lib/config/env.dart` | Contiene la clase `Env` que expone `apiBaseV1`, leída de `--dart-define-from-file=./env.dev.json`. |
-| **Clientes HTTP (Dio)** | `lib/config/api.dart` | Exporta las instancias globales `apiAuth` y `apiPublic` con interceptores, idempotencia y autorefresco de tokens. |
-| **Entidades de Dominio** | `lib/domain/<entidad>_model.dart` | Define los datos puros sin dependencias externas ni parseo sucio. |
-| **Estados de Dominio** | `lib/domain/<entidad>_state.dart` | Define la estructura de estado inmutable para los Notifiers. |
-| **Mappers de Datos** | `lib/infrastructure/mappers/<entidad>_mapper.dart` | Convierte de forma segura entre `Map<String, dynamic>` y la entidad, **sin usar `as`**. |
-| **Providers de Riverpod** | `lib/presentation/providers/<entidad>_provider.dart` | Lógica de negocio, gestión de llamadas a la API y mutación del estado. |
-| **Pantallas (Screens)** | `lib/presentation/screens/<modulo>/<pantalla>_screen.dart` | Vistas principales de la app agrupadas por módulo (`auth/`, `user/`, `admin/`, etc.). |
-| **Widgets Exclusivos** | `lib/presentation/widgets/<pantalla>/<widget>.dart` | Componentes privados exclusivos de una pantalla para evitar saturación en la raíz. |
-| **Widgets Compartidos** | `lib/presentation/widgets/` o `widgets/common/` | Componentes reutilizables en toda la aplicación (`custom_button.dart`, etc.). |
+| **Variables de Entorno** | `lib/config/env.dart` | Expone `apiBaseV1` inyectada mediante `env.dev.json`. |
+| **Clientes HTTP (Dio)** | `lib/config/api.dart` | Exporta `apiAuth` y `apiPublic` con interceptores, idempotencia y cola de refresco. |
+| **Entidades de Dominio** | `lib/domain/<entidad>_model.dart` | Clases de datos inmutables y puras, sin acoplamiento a frameworks de red. |
+| **Estados de Dominio** | `lib/domain/<entidad>_state.dart` | Estructuras de estado inmutable para Providers y Notifiers complejos. |
+| **Mappers de Datos** | `lib/infrastructure/mappers/<entidad>_mapper.dart` | Desempaquetado seguro sin `as`, utilizando `tryParse` y validación booleana segura. |
+| **Providers de Riverpod** | `lib/presentation/providers/<entidad>_provider.dart` | Lógica de negocio, consumo de endpoints y emisión de estados (`AsyncNotifier`). |
+| **Pantallas (Screens)** | `lib/presentation/screens/<modulo>/<pantalla>_screen.dart` | Vistas principales agrupadas por rol (`admin/`, `auth/`, `guest/`, `manger/`, `user/`). |
+| **Widgets de Módulo** | `lib/presentation/widgets/<modulo>/<widget>.dart` | Componentes encapsulados por función (`manger/`, `subscription/`, `daypass/`, `payment/`). |
+| **Widgets Globales** | `lib/presentation/widgets/` o `widgets/common/` | Componentes transversales (`custom_button.dart`, `gym_detail_modal.dart`). |
 
 ---
 
-## 2. Cómo Funciona Dio Internamente (`lib/config/api.dart`)
+## 3. Funcionamiento Interno de Dio (`lib/config/api.dart`)
 
-El proyecto cuenta con dos instancias centralizadas de `Dio`:
+El proyecto dispone de dos instancias centralizadas de `Dio`:
 
 ### A. `apiPublic`
-* **Para qué se usa**: Rutas que no requieren token de sesión previo (`/auth/login-mobile`, `/auth/register`, `/auth/refresh-token-mobile`, `/auth/forgot-password`).
-* **Idempotencia automática**: Intercepta automáticamente peticiones `POST`, `PUT` y `PATCH`, generando una cabecera `X-Idempotency-Key` única (UUID v4) a partir de la huella digital (`método + ruta + body`). Limpia la clave al resolverse la respuesta.
+* **Propósito**: Endpoints accesibles sin sesión iniciada (`/auth/login-mobile`, `/auth/register`, `/auth/forgot-password`, `/payments/stripe/guest-checkout`, `/payments/stripe/session/:id`, `/daypass/guest`, `/gyms/public`).
+* **Idempotencia Automática**: En peticiones `POST`, `PUT` y `PATCH`, intercepta la llamada y genera la cabecera `X-Idempotency-Key` (UUID v4) calculada a partir de la firma `método + endpoint + payload`. Remueve la clave al recibir respuesta exitosa.
 
 ### B. `apiAuth`
-* **Para qué se usa**: Cualquier ruta protegida de la aplicación.
-* **Inyección de Token**: Lee el token de acceso desde la memoria del `authProvider` e inyecta la cabecera `Authorization: Bearer <access_token>`.
-* **Cola de Espera y Auto-Refresh ante 401**:
-  1. Si una petición responde con código `401 Unauthorized`:
-  2. Si ya hay una renovación en progreso (`_isRefreshing = true`), la petición crea un `Completer` y se encola en `_failedQueue`.
-  3. Si es la primera en fallar, activa `_isRefreshing = true` y ejecuta el callback de refresco.
-  4. El callback toma el `refresh_token` almacenado de forma segura en `FlutterSecureStorage` y llama a `POST /auth/refresh-token-mobile`.
-  5. Con el nuevo par de credenciales (`access_token` en memoria y `refresh_token` en almacenamiento seguro), se liberan todas las peticiones encoladas en `_failedQueue` inyectándoles el nuevo token y se reintenta la petición original con `dio.fetch`.
-  6. Si el refresco falla, se limpia la sesión y se rechazan las peticiones pendientes.
+* **Propósito**: Cualquier ruta protegida por JWT (roles Usuario, Propietario o Encargado de mostrador).
+* **Inyección de Token**: Lee el token activo desde `authProvider` en memoria y añade la cabecera `Authorization: Bearer <token>`.
+* **Cola Concurrente y Auto-Refresh ante error 401**:
+  1. Si un endpoint protegido responde con `401 Unauthorized`:
+  2. Si ya hay una renovación en curso (`_isRefreshing == true`), la petición actual genera un `Completer` y se encola en `_failedQueue`.
+  3. Si es la primera en fallar, bloquea la cola y ejecuta el callback de refresco.
+  4. Lee el `refresh_token` de `FlutterSecureStorage` y realiza una petición a `POST /auth/refresh-token-mobile`.
+  5. Recibe el nuevo par de tokens (`access_token` en memoria y nuevo `refresh_token` seguro).
+  6. Reintenta la petición original con `dio.fetch` y desbloquea todas las solicitudes encoladas en `_failedQueue` actualizándoles la cabecera.
+  7. Si el refresco falla (token expirado o revocado en Redis), se destruye la sesión y se redirige a la pantalla de login.
 
 ---
 
-## 3. Estado Global de Autenticación (`lib/presentation/providers/auth_provider.dart`)
+## 4. Catálogo de Endpoints y Providers Asociados
 
-Expone `authProvider` mediante `AsyncNotifierProvider`:
+### A. Autenticación y Perfil (`authProvider`, `userProvider`)
+* `POST /auth/login-mobile`: Inicio de sesión (devuelve tokens y rol: `1=Usuario`, `2=Dueño`, `3=Manager`).
+* `POST /auth/register`: Registro de usuario con selector de tipo de cuenta (`Usuario` o `Dueño`).
+* `POST /auth/refresh-token-mobile`: Renovación silenciosa de credenciales.
+* `POST /auth/logout-mobile`: Revocación de tokens en Redis (`blacklist`).
+* `GET /users/me`: Consulta de perfil del usuario logueado.
+* `POST /users`: Creación inicial de datos de perfil de usuario.
+* `PUT /users/me`: Actualización de perfil del usuario.
 
-```dart
-final authProvider = AsyncNotifierProvider<AuthNotifier, AuthState>(
-  AuthNotifier.new,
-);
-```
+### B. Membresías y Suscripciones (`userSubscriptionsProvider`, `planProvider`)
+* `GET /subscriptions/my-subscriptions`: Lista de membresías históricas y activas del usuario.
+* `POST /subscriptions/subscribe`: Alta de nueva suscripción en un gimnasio.
+* `POST /subscriptions/:id/cancel`: Cancelación voluntaria de membresía activa.
+* `GET /gyms/:gymId/plans`: Catálogo de planes y membresías ofertadas por sede.
+* `GET /gyms/:gymId/plans/enrollment`: Información combinada de membresía actual y planes disponibles.
 
-### Métodos disponibles para usar en la UI:
-* **Iniciar Sesión**: Llama a `/auth/login-mobile`, guarda `refresh_token` en `FlutterSecureStorage` y `access_token` en memoria.
-  ```dart
-  await ref.read(authProvider.notifier).login(email, password);
-  ```
-* **Cerrar Sesión**: Llama a `POST /auth/logout-mobile`, revoca ambos tokens en Redis (`blacklist`), borra `FlutterSecureStorage` y restablece el estado.
-  ```dart
-  await ref.read(authProvider.notifier).logout();
-  ```
-* **Consultar Token Actual en Memoria**:
-  ```dart
-  final token = ref.read(authProvider.notifier).getToken();
-  ```
-* **Validar Sesión Activa**: Consulta `GET /auth/session` revalidando el estado del usuario.
-  ```dart
-  await ref.read(authProvider.notifier).getSession();
-  ```
+### C. Transacciones y Pasarela Stripe (`paymentProvider`, `userPaymentsProvider`, `gymPaymentsProvider`)
+* `GET /payments/my-payments`: Historial de facturas y recibos de pago del usuario logueado.
+* `POST /payments/stripe/checkout-session`: Creación de sesión Stripe Checkout para suscripción autenticada.
+* `POST /payments/stripe/guest-checkout`: Creación de sesión Stripe Checkout para pases de invitado sin cuenta.
+* `GET /payments/stripe/session/:sessionId`: Verificación pública o autenticada del estatus de pago (`complete`, `paid`).
+* `POST /payments/cash`: Registro de cobro en efectivo desde el mostrador por el Gym Manager.
+* `GET /gyms/:gymId/payments`: Auditoría de pagos recibidos en una sede específica.
+* `GET /gyms/:gymId/payments/revenue`: Métricas acumuladas de facturación por sede.
+
+### D. Caja y Turno de Mostrador (`cashRegisterProvider`)
+* `GET /cash-registers/current`: Estado de la caja actual para el Gym Manager (abierta o cerrada).
+* `POST /cash-registers/open`: Apertura de turno con monto inicial en efectivo.
+* `POST /cash-registers/close`: Cierre de turno, arqueo con efectivo final contado y notas del turno.
+
+### E. Control de Accesos y Asistencia (`counterCheckInProvider`, `dayPassProvider`)
+* `POST /checkin`: Registro de acceso por QR o email para miembros con membresía activa.
+* `POST /daypass/verify`: Validación y consumo del pase de un día en mostrador.
+* `GET /daypass/pending`: Lista de pases pendientes de uso o cobro en sede.
 
 ---
 
-## 4. Guía Paso a Paso: Cómo Implementar un Nuevo Endpoint
+## 5. Patrón Paso a Paso para Consumir un Endpoint
 
-Ejemplo práctico: Implementar la entidad **Gimnasio (`Gym`)** con listado y creación.
-
-### Paso 1: Crear la Entidad en Dominio
-Archivo: `lib/domain/gym_model.dart`
-
+### Paso 1: Definir la Entidad de Dominio (`lib/domain/`)
 ```dart
-class Gym {
+class MyEntity {
   final int id;
-  final String name;
-  final String address;
-  final double rating;
-  final bool isActive;
+  final String title;
 
-  const Gym({
-    this.id = 0,
-    this.name = '',
-    this.address = '',
-    this.rating = 0.0,
-    this.isActive = false,
-  });
+  const MyEntity({this.id = 0, this.title = ''});
 }
 ```
 
----
-
-### Paso 2: Crear el Mapper Seguro en Infraestructura
-Archivo: `lib/infrastructure/mappers/gym_mapper.dart`
-*(Aplicar la regla de oro: cero `as`)*
-
+### Paso 2: Crear el Mapper Seguro (`lib/infrastructure/mappers/`)
 ```dart
-import 'package:fitbase/domain/gym_model.dart';
-
-class GymMapper {
-  static Map<String, dynamic>? toNullableMap(dynamic value) {
-    if (value is Map) {
-      return value.map((key, val) => MapEntry(key.toString(), val));
-    }
-    return null;
+class MyEntityMapper {
+  static Map<String, dynamic> toSafeMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((k, v) => MapEntry(k.toString(), v));
+    return const {};
   }
 
-  static Map<String, dynamic> toSafeMap(dynamic value) {
-    if (value is Map) {
-      return value.map((key, val) => MapEntry(key.toString(), val));
-    }
-    return {};
-  }
-
-  static Gym fromMap(Map<String, dynamic> map) {
-    return Gym(
+  static MyEntity fromMap(Map<String, dynamic> map) {
+    return MyEntity(
       id: int.tryParse(map['id']?.toString() ?? '') ?? 0,
-      name: map['name']?.toString() ?? '',
-      address: map['address']?.toString() ?? '',
-      rating: double.tryParse(map['rating']?.toString() ?? '') ?? 0.0,
-      isActive: map['is_active'] == true ||
-          map['is_active']?.toString().toLowerCase() == 'true',
+      title: map['title']?.toString() ?? '',
     );
   }
-
-  static Map<String, dynamic> toMap(Gym gym) {
-    return {
-      'id': gym.id,
-      'name': gym.name,
-      'address': gym.address,
-      'rating': gym.rating,
-      'is_active': gym.isActive,
-    };
-  }
 }
 ```
 
----
-
-### Paso 3: Crear el Provider en Presentación
-Archivo: `lib/presentation/providers/gym_provider.dart`
-
+### Paso 3: Crear el AsyncNotifier (`lib/presentation/providers/`)
 ```dart
-import 'dart:async';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fitbase/config/api.dart';
-import 'package:fitbase/domain/gym_model.dart';
-import 'package:fitbase/infrastructure/mappers/gym_mapper.dart';
-
-class GymNotifier extends AsyncNotifier<List<Gym>> {
-  List<Gym> get _current => state.value ?? const [];
-
+class MyEntityNotifier extends AsyncNotifier<List<MyEntity>> {
   @override
-  Future<List<Gym>> build() async {
-    return _fetchGyms();
+  Future<List<MyEntity>> build() async {
+    return getEntities();
   }
 
-  Future<List<Gym>> _fetchGyms() async {
-    final res = await apiAuth.get('/gyms');
-    final resMap = GymMapper.toSafeMap(res.data);
-    final rawList = resMap['data'];
-
-    if (rawList is List) {
-      return rawList
-          .whereType<Map>()
-          .map((item) => GymMapper.fromMap(GymMapper.toSafeMap(item)))
-          .toList();
-    }
-    return [];
-  }
-
-  Future<void> createGym(String name, String address) async {
+  Future<List<MyEntity>> getEntities() async {
     state = const AsyncLoading();
     try {
-      await apiAuth.post('/gyms', data: {
-        'name': name,
-        'address': address,
-      });
-      final updatedList = await _fetchGyms();
-      state = AsyncData(updatedList);
+      final res = await apiAuth.get('/my-endpoint');
+      final resMap = MyEntityMapper.toSafeMap(res.data);
+      final rawList = resMap['data'] as List? ?? [];
+      final list = rawList
+          .map((item) => MyEntityMapper.fromMap(MyEntityMapper.toSafeMap(item)))
+          .toList();
+      state = AsyncData(list);
+      return list;
     } catch (e, stack) {
       state = AsyncError(e, stack);
-      rethrow;
+      return const [];
     }
-  }
-
-  Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _fetchGyms());
   }
 }
 
-final gymProvider = AsyncNotifierProvider<GymNotifier, List<Gym>>(
-  GymNotifier.new,
+final myEntityProvider = AsyncNotifierProvider<MyEntityNotifier, List<MyEntity>>(
+  MyEntityNotifier.new,
 );
 ```
 
----
-
-### Paso 4: Crear la Pantalla y Widgets Exclusivos
-
-* Crear la pantalla en: `lib/presentation/screens/user/gym_list_screen.dart`
-* Crear los widgets exclusivos de la pantalla en: `lib/presentation/widgets/gym_list/gym_item_card.dart`
-
-#### Widget Exclusivo (`lib/presentation/widgets/gym_list/gym_item_card.dart`):
+### Paso 4: Consumir en la Vista con `when(...)` y `ValueNotifier`
 ```dart
-import 'package:flutter/material.dart';
-import 'package:fitbase/domain/gym_model.dart';
-import 'package:fitbase/config/theme/app_colors.dart';
-
-class GymItemCard extends StatelessWidget {
-  final Gym gym;
-  final VoidCallback? onTap;
-
-  const GymItemCard({super.key, required this.gym, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: AppColors.surface,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ListTile(
-        title: Text(gym.name, style: const TextStyle(color: AppColors.textPrimary)),
-        subtitle: Text(gym.address, style: const TextStyle(color: AppColors.textSecondary)),
-        trailing: Text('${gym.rating} ★', style: const TextStyle(color: AppColors.primary)),
-        onTap: onTap,
-      ),
-    );
-  }
-}
-```
-
-#### Pantalla (`lib/presentation/screens/user/gym_list_screen.dart`):
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fitbase/presentation/providers/gym_provider.dart';
-import 'package:fitbase/presentation/widgets/gym_list/gym_item_card.dart';
-import 'package:fitbase/config/theme/app_colors.dart';
-
-class GymListScreen extends ConsumerWidget {
-  const GymListScreen({super.key});
+class MyScreen extends ConsumerWidget {
+  const MyScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final gymAsyncValue = ref.watch(gymProvider);
+    final stateAsync = ref.watch(myEntityProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Gimnasios'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(gymProvider.notifier).refresh(),
-          ),
-        ],
-      ),
-      body: gymAsyncValue.when(
-        data: (gyms) {
-          if (gyms.isEmpty) {
-            return const Center(
-              child: Text(
-                'No hay gimnasios disponibles',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            );
-          }
-          return ListView.builder(
-            itemCount: gyms.length,
-            itemBuilder: (context, index) {
-              return GymItemCard(gym: gyms[index]);
-            },
-          );
-        },
-        loading: () => const Center(
-          child: RepaintBoundary(
-            child: CircularProgressIndicator(),
-          ),
+      body: stateAsync.when(
+        data: (items) => ListView.builder(
+          itemCount: items.length,
+          itemBuilder: (ctx, i) => ListTile(title: Text(items[i].title)),
         ),
-        error: (error, stack) => Center(
-          child: Text(
-            'Error: $error',
-            style: const TextStyle(color: AppColors.error),
-          ),
-        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Error: $err')),
       ),
     );
   }
@@ -299,11 +200,9 @@ class GymListScreen extends ConsumerWidget {
 
 ---
 
-## 5. Resumen de Buenas Prácticas al Escribir Código
+## 6. Estándares Obligatorios de Codificación
 
-1. **Lectura vs Mutación en Riverpod**:
-   * Para pintar la UI y reaccionar a cambios: **`ref.watch(miProvider)`**.
-   * Para disparar acciones en callbacks (`onPressed`, `onTap`): **`ref.read(miProvider.notifier).miMetodo(...)`**. Nunca usar `watch` dentro de un botón o función de evento.
-2. **Cero Comentarios**: Ningún archivo Dart debe contener comentarios (`//`, `/* */`).
-3. **Parseo Seguro en Mappers**: Utilizar siempre `tryParse` y validación segura booleana.
-4. **Organización de Widgets**: Todo widget creado exclusivamente para una pantalla debe ir en `widgets/<pantalla>/`.
+1. **Cero Comentarios**: Ningún archivo fuente `.dart` debe incluir comentarios de línea (`//`) ni de bloque (`/* */`, `///`).
+2. **Sin Casteos Débiles**: Prohibido usar `as String`, `as int`, `as Map` en mappers. Utilizar `tryParse`, `toString()`, `toSafeMap` y validación booleana segura.
+3. **Estado Local**: Usar obligatoriamente `ValueNotifier<T>` y `ValueListenableBuilder<T>` para banderas y variables de estado local (`_loading`, `_obscurePassword`, filtros). Evitar `setState` salvo en variables de tipo `TextEditingController`.
+4. **Separación de Widgets**: Todo widget secundario exclusivo de una pantalla debe residir en su subcarpeta correspondiente dentro de `lib/presentation/widgets/<modulo>/`.

@@ -1,10 +1,44 @@
 # Guía de Arquitectura, Providers y Consumo de APIs en Fitbase
 
-Esta guía documenta los estándares de Clean Architecture, la nomenclatura de archivos, la creación de Providers con la versión moderna de Riverpod (3.x), la regla de oro para Mappers y el consumo del cliente HTTP (Dio) en la UI.
+Esta guía documenta los estándares de Clean Architecture, organización modular de archivos, creación de Providers bajo la versión moderna de **Riverpod (3.x)**, regla de oro para Mappers sin `as`, optimización de estado local con `ValueNotifier` y guardianes de navegación por roles en **Fitbase**.
 
 ---
 
-## 1. Nomenclatura y Organización de Archivos
+## Enlaces del Proyecto
+
+* **Descarga del APK (Android Release)**: [https://zurl.mmabitec.uk/nbQlPz](https://zurl.mmabitec.uk/nbQlPz)
+* **Repositorio del Backend (API REST)**: [https://github.com/Moisessantos45/fitbase_backend](https://github.com/Moisessantos45/fitbase_backend)
+* **Repositorio de la Aplicación Móvil**: [https://github.com/Moisessantos45/fitbase](https://github.com/Moisessantos45/fitbase)
+
+---
+
+## 1. Cómo Ejecutar y Compilar la Aplicación
+
+### A. Requisitos
+* Flutter SDK versión 3.24+ (Dart 3.5+)
+* Dispositivo físico Android con depuración USB o emulador activo
+* Archivo de variables de entorno `env.dev.json` en la raíz del proyecto:
+  ```json
+  {
+    "API_BASE_V1": "https://fitbase.mmabitec.uk/api/v1"
+  }
+  ```
+
+### B. Comandos Principales
+```bash
+# Instalar paquetes
+flutter pub get
+
+# Ejecución en modo desarrollo
+flutter run --dart-define-from-file=./env.dev.json
+
+# Compilación de APK Release para producción
+flutter build apk --release --dart-define-from-file=./env.dev.json --obfuscate --split-debug-info=build/app/outputs/symbols
+```
+
+---
+
+## 2. Nomenclatura y Organización de Archivos
 
 Todos los archivos deben nombrarse bajo el formato snake_case identificando la entidad y el rol que cumplen:
 * **Entidades / Modelos**: `<entidad>_model.dart`
@@ -13,335 +47,165 @@ Todos los archivos deben nombrarse bajo el formato snake_case identificando la e
 * **Providers / Notifiers**: `<entidad>_provider.dart`
 * **Widgets**: `<nombre_componente>.dart`
 
-### Regla para el uso de subcarpetas (Domain, Infrastructure, Providers y Widgets):
+### Regla para el uso de subcarpetas:
 * **`lib/domain/`**:
-  * **Archivo único**: Directo en la raíz (ej. `lib/domain/user_model.dart`).
-  * **Múltiples archivos**: Crear subcarpeta por entidad (ej. `lib/domain/user/user_model.dart`, `lib/domain/user/profile_model.dart`).
+  * Contiene las entidades y estados puros desacoplados de cualquier librería externa o SDK de red.
+  * Archivos individuales en la raíz (ej. `lib/domain/payment_model.dart`, `lib/domain/cash_register_model.dart`). Subcarpeta solo si son múltiples archivos dependientes de una misma entidad.
 * **`lib/infrastructure/mappers/`**:
-  * **Archivo único**: Directo en la raíz (ej. `lib/infrastructure/mappers/user_mapper.dart`).
-  * **Múltiples archivos**: Crear subcarpeta por entidad (ej. `lib/infrastructure/mappers/user/user_mapper.dart`).
+  * Contiene la lógica de transformación entre los mapas de datos de la API y las entidades de dominio.
+  * Archivos individuales en la raíz (ej. `lib/infrastructure/mappers/payment_mapper.dart`).
 * **`lib/presentation/providers/`**:
-  * **Archivo único**: Directo en la raíz (ej. `lib/presentation/providers/user_provider.dart`).
-  * **Múltiples archivos**: Crear subcarpeta por entidad (ej. `lib/presentation/providers/user/user_provider.dart`).
+  * Notifiers y providers que gestionan la lógica de negocio y mutación de estado con Riverpod 3.x.
+  * Archivos individuales en la raíz (ej. `lib/presentation/providers/user_provider.dart`).
 * **`lib/presentation/widgets/`**:
-  * **Widgets específicos de una pantalla**: Crear una carpeta dedicada para los widgets que pertenecen a una pantalla o entidad (ej. `lib/presentation/widgets/login/`, `lib/presentation/widgets/workout_detail/`) para evitar saturar la raíz o revolverlos con los de otras pantallas.
-  * **Widgets genéricos / reutilizables**: Los componentes reutilizables transversales a toda la app (como `custom_button.dart`, `custom_text_field.dart`) van en la raíz de `lib/presentation/widgets/` o en `widgets/common/`.
+  * **Widgets específicos de una pantalla o módulo**: Crear una carpeta dedicada por módulo o pantalla (ej. `lib/presentation/widgets/manger/`, `lib/presentation/widgets/subscription/`, `lib/presentation/widgets/daypass/`, `lib/presentation/widgets/payment/`) para evitar sobrecargar la raíz del proyecto.
+  * **Widgets globales y transversales**: Ubicados en `lib/presentation/widgets/` o `lib/presentation/widgets/common/` (ej. `custom_button.dart`, `gym_detail_modal.dart`).
 
 ---
 
-## 2. Capa de Dominio (`lib/domain/`)
+## 3. Capa de Dominio (`lib/domain/`)
 
-* Contiene las **entidades y modelos puros**.
-* **Prohibido**: Depender de librerías de infraestructura como Dio o paquetes de terceros específicos de red o almacenamiento.
-* Las entidades no contienen lógica de serialización `fromMap` o `as Map`, solo sus propiedades y métodos de dominio.
+* Las entidades representan los conceptos clave del negocio y son **100% inmutables**.
+* **Prohibido**: Importar librerías de infraestructura como `dio`, `shared_preferences` o `flutter_secure_storage`.
+* Las entidades no contienen constructores `fromMap` o `toJson`, solo sus atributos, constructor `const` con valores por defecto seguros y helpers computados de conveniencia (ej. `bool get isPaid`).
 
 ---
 
-## 3. Capa de Infraestructura y Mappers (`lib/infrastructure/mappers/`)
+## 4. Capa de Infraestructura y Mappers (`lib/infrastructure/mappers/`)
 
-### ⚠️ Regla de Oro de los Mappers: NUNCA usar `as`
-El operador `as` de Dart rompe la aplicación en runtime si el backend envía un tipo inesperado (`null`, `int` en vez de `String`, etc.). 
+### Regla de Oro: Prohibido usar `as` al desempaquetar JSON
+Nunca se debe forzar el tipo con `as String`, `as int`, `as double`, `as bool` o `as Map<String, dynamic>`. Si el backend cambia un entero a `null`, envía un número como texto o modifica la estructura, la aplicación lanzará un error de tipo en tiempo de ejecución.
 
-#### Estándar de Mapeo Seguro:
+### Métodos Auxiliares Estándar:
+Todo mapper debe incorporar helpers para sanear colecciones y mapas antes de leer sus campos:
+
 ```dart
-class UserMapper {
-  static Map<String, dynamic>? toNullableMap(dynamic value) {
-    if (value is Map) {
-      return value.map((key, val) => MapEntry(key.toString(), val));
-    }
+class MyMapper {
+  static Map<String, dynamic> toSafeMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((k, v) => MapEntry(k.toString(), v));
+    return const {};
+  }
+
+  static Map<String, dynamic>? toNullableMap(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return raw.map((k, v) => MapEntry(k.toString(), v));
     return null;
   }
-
-  static Map<String, dynamic> toSafeMap(dynamic value) {
-    if (value is Map) {
-      return value.map((key, val) => MapEntry(key.toString(), val));
-    }
-    return {};
-  }
-
-  static User fromMap(Map<String, dynamic> map) {
-    return User(
-      id: int.tryParse(map['id']?.toString() ?? '') ?? 0,
-      name: map['name']?.toString() ?? '',
-      price: double.tryParse(map['price']?.toString() ?? '') ?? 0.0,
-      isActive: map['is_active'] == true ||
-          map['is_active']?.toString().toLowerCase() == 'true',
-    );
-  }
-
-  static Map<String, dynamic> toMap(User user) {
-    return {
-      'id': user.id,
-      'name': user.name,
-      'price': user.price,
-      'is_active': user.isActive,
-    };
-  }
 }
 ```
+
+### Conversión Segura de Tipos:
+* **Strings**: `map['name']?.toString() ?? ''`
+* **Enteros**: `int.tryParse(map['id']?.toString() ?? '') ?? 0`
+* **Decimales**: `double.tryParse(map['price']?.toString() ?? '') ?? 0.0`
+* **Booleanos**: `map['is_active'] == true || map['is_active']?.toString().toLowerCase() == 'true'`
+* **Listas**: Iterar mapeando cada elemento a través de `toNullableMap` para descartar registros nulos o corruptos.
 
 ---
 
-## 4. Creación de Providers con Riverpod Moderno (3.x)
+## 5. Gestión de Estado con Riverpod 3.x (`lib/presentation/providers/`)
 
-En Riverpod 2.x/3.x, los Notifiers se instancian utilizando el constructor tear-off (`.new`).
+Se utiliza la versión moderna de Riverpod sin generadores de código para máxima claridad y control sobre el ciclo de vida.
 
-### A. Provider Asíncrono (`AsyncNotifier` + `AsyncNotifierProvider`)
-Recomendado cuando el estado representa una carga asíncrona de datos:
+### Reglas Esenciales:
+1. **Constructor Tear-Off**: Declarar providers siempre utilizando la sintaxis de constructor tear-off (`.new`):
+   ```dart
+   final userProvider = AsyncNotifierProvider<UserNotifier, UserModel?>(
+     UserNotifier.new,
+   );
+   ```
+2. **Ciclo de Construcción Inmutable**: En notifiers de tipo `AsyncNotifier`, sobreescribir `build()` devolviendo el estado inicial o ejecutando la carga asíncrona primaria.
+3. **Lectura y Mutación Segura**:
+   * Para actualizar el estado manteniendo datos existentes: `state = AsyncData(nuevoValor);`
+   * Para emitir estado de carga: `state = const AsyncLoading();`
+   * Para emitir errores capturados: `state = AsyncError(e, stack);`
 
+---
+
+## 6. Consumo en la Interfaz de Usuario (`lib/presentation/screens/`)
+
+### A. Consumir Estados Asíncronos con `when(...)`
 ```dart
-final userNotifierProvider =
-    AsyncNotifierProvider<UserNotifier, List<User>>(UserNotifier.new);
+final userAsync = ref.watch(userProvider);
 
-class UserNotifier extends AsyncNotifier<List<User>> {
-  @override
-  Future<List<User>> build() async {
-    return _fetchUsers();
-  }
-
-  Future<List<User>> _fetchUsers() async {
-    final res = await apiAuth.get('/users');
-    final resMap = UserMapper.toSafeMap(res.data);
-    final listRaw = resMap['data'];
-    if (listRaw is List) {
-      return listRaw
-          .whereType<Map>()
-          .map((item) => UserMapper.fromMap(UserMapper.toSafeMap(item)))
-          .toList();
-    }
-    return [];
-  }
-
-  Future<void> refresh() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _fetchUsers());
-  }
-}
-```
-
-### B. Provider con Parámetros (`family` en versión moderna)
-```dart
-final subfoldersProvider =
-    AsyncNotifierProvider.family<SubfoldersNotifier, List<Subfolder>, String>(
-  SubfoldersNotifier.new,
+return userAsync.when(
+  data: (user) => UserProfileView(user: user),
+  loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+  error: (err, stack) => Center(child: Text('Error: $err')),
 );
-
-class SubfoldersNotifier extends FamilyAsyncNotifier<List<Subfolder>, String> {
-  @override
-  Future<List<Subfolder>> build(String arg) async {
-    return _fetchSubfolders(arg);
-  }
-
-  Future<List<Subfolder>> _fetchSubfolders(String folderId) async {
-    final res = await apiAuth.get('/folders/$folderId/subfolders');
-    ...
-  }
-}
 ```
+
+### B. Disparo de Acciones en Eventos
+* **Prohibido**: Utilizar `ref.watch` dentro de manejadores de eventos (`onPressed`, `onTap`, `initState`).
+* **Correcto**: Utilizar `ref.read(miProvider.notifier).miMetodo(...)`.
 
 ---
 
-## 5. Consumo de Instancias de Dio (`apiAuth` y `apiPublic`)
+## 7. Control de Acceso y Navegación Protegida por Roles
 
-Se encuentran centralizadas en `lib/config/api.dart`:
+Fitbase cuenta con 4 roles de acceso definidos:
+* **Rol 1 (`Usuario / Cliente`)**: Acceso a `UserMainScreen()` (dashboard deportivo, credencial QR, membresías y pagos).
+* **Rol 2 (`Dueño / Propietario`)**: Acceso a `AdminMainScreen()` (gestión financiera, sedes, planes y padrón de socios).
+* **Rol 3 (`Gym Manager / Mostrador`)**: Acceso a `ManagerMainScreen()` (apertura y cierre de caja, cobro en recepción y escáner QR de pases y asistencias).
+* **Invitado (`Guest`)**: Acceso a `GuestHomeScreen()` para exploración libre y compra de pases individuales sin cuenta previa.
 
-```dart
-import 'package:fitbase/config/api.dart';
-```
+### Guardián Centralizado: `AuthGate`
+Determina la pantalla inicial según la persistencia de sesión:
+1. Si no hay sesión iniciada (`roleId == null`): Redirige a `GuestHomeScreen()`.
+2. Si el rol es 1: Muestra `UserMainScreen()`.
+3. Si el rol es 2: Muestra `AdminMainScreen()`.
+4. Si el rol es 3: Muestra `ManagerMainScreen()`.
 
-1. **`apiPublic`**:
-   * Usada para rutas abiertas como `/auth/login-mobile`, `/auth/register`, `/auth/refresh-token-mobile`.
-   * Incluye idempotencia automática (`X-Idempotency-Key`) en peticiones `POST`, `PUT` y `PATCH`.
-
-2. **`apiAuth`**:
-   * Usada para cualquier endpoint protegido.
-   * Inyecta automáticamente el token de acceso `Authorization: Bearer <token>` desde memoria.
-   * Maneja errores `401 Unauthorized` de forma transparente: pone en cola las peticiones concurrentes, ejecuta la rotación mediante el refresh token en almacenamiento seguro y reintenta todas las peticiones con las nuevas credenciales.
-
----
-
-## 6. Consumo en la UI con Riverpod
-
-Para consumir los providers en la interfaz se utiliza `ConsumerWidget` o `ConsumerStatefulWidget`, leyendo el estado reactivo mediante `ref.watch(...)` y renderizando mediante el método `.when(...)`:
-
-```dart
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:fitbase/config/theme/app_colors.dart';
-import 'package:fitbase/presentation/providers/subfolders_provider.dart';
-
-class FolderDetailView extends ConsumerWidget {
-  final String folderId;
-  const FolderDetailView({super.key, required this.folderId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final subfoldersAsyncValue = ref.watch(subfoldersProvider(folderId));
-
-    return CustomScrollView(
-      slivers: [
-        subfoldersAsyncValue.when(
-          data: (subfolders) {
-            if (subfolders.isEmpty) {
-              return const SliverToBoxAdapter(
-                child: SizedBox.shrink(),
-              );
-            }
-            return SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 6,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Subcarpetas",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          "${subfolders.length}",
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    height: 106,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: subfolders.length,
-                      itemBuilder: (context, index) {
-                        final sub = subfolders[index];
-                        return SubFolderItem(
-                          name: sub.name,
-                          captureCount: "${sub.captureCount}",
-                          onTap: () => _openSubfolder(context, sub),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            );
-          },
-          loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-          error: (error, stack) =>
-              const SliverToBoxAdapter(child: SizedBox.shrink()),
-        ),
-      ],
-    );
-  }
-
-  void _openSubfolder(BuildContext context, dynamic subfolder) {}
-}
-```
-
----
-
-## 7. Protección de Pantallas y Control de Acceso por Roles (`AuthGate` y `RoleGuard`)
-
-Para replicar el comportamiento de los middlewares de rutas (como los de Nuxt/Vue) en Flutter nativo sin añadir librerías adicionales:
-
-### A. Guardián Raíz Reactivo (`lib/presentation/screens/auth_gate.dart`)
-Se establece como `home: const AuthGate()` en `MaterialApp`. Evalúa en tiempo real el estado de autenticación y roles de Riverpod:
-1. **Sin autenticación**: Muestra `LoginScreen()`.
-2. **Perfil Incompleto (`fullProfile == false`)**: Redirige forzosamente a la pantalla de completar perfil exclusiva de cada rol:
-   * **Propietario / Dueño (`roleId == 2`)**: `AdminProfileScreen()` en `lib/presentation/screens/admin/admin_profile_screen.dart`.
-   * **Gerente / Manager (`roleId == 3`)**: `ManagerProfileScreen()` en `lib/presentation/screens/manger/manager_profile_screen.dart`.
-   * **Cliente / Usuario (`roleId == 1`)**: `UserProfileScreen()` en `lib/presentation/screens/user/user_profile_screen.dart`.
-3. **Autenticado y Completo**:
-   * Si es Propietario (`roleId == 2`) o Manager (`roleId == 3`): Muestra `AdminMainScreen()`.
-   * Si es Cliente/Usuario (`roleId == 1`): Muestra `UserMainScreen()`.
-4. **Verificación Inicial**: Mientras valida la sesión con `getSession()` en segundo plano, renderiza un loader con `RepaintBoundary`.
-
-### B. Guardián de Roles en Navegación (`lib/config/navigation/custom_navigator.dart`)
-Para proteger cualquier transición entre pantallas dentro de la app:
-
+### Transiciones Protegidas: `CustomNavigator`
 ```dart
 CustomNavigator.pushProtectedFade(
   context,
   ref,
-  const AdminPlansScreen(),
-  allowedRoles: [2, 3], // Solo Propietario o Manager
-  deniedMessage: 'Sección exclusiva para administradores',
+  const ManagerCounterScreen(),
+  allowedRoles: [3],
+  deniedMessage: 'Sección exclusiva para personal de mostrador',
 );
 ```
 
-Si el usuario no cuenta con el rol requerido, bloquea la navegación y notifica al usuario con un `SnackBar`.
-
 ---
 
-## 8. Optimización de Estado Local en Pantallas (`ValueNotifier` vs `setState`)
+## 8. Optimización de Estado Local con `ValueNotifier`
 
-Para evitar reconstrucciones innecesarias de todo el árbol de widgets (`re-build`), se sigue estrictamente la siguiente regla:
+Para optimizar renders y evitar reconstrucciones completas del árbol de widgets con `setState`, se aplica de forma obligatoria:
 
-### Regla:
-* **Variables de estado local (`_submitted`, `_loading`, `_obscurePassword`, `_acceptTerms`, toggles, filtros)**: Deben declararse obligatoriamente con `ValueNotifier<T>` y consumirse puntualmente con `ValueListenableBuilder<T>`.
-* **Liberación de memoria**: Todo `ValueNotifier` debe liberarse en el método `dispose()` de la pantalla mediante `.dispose()`.
-* **Excepción estricta**: Los controladores de texto (`TextEditingController`) **no** se encapsulan en `ValueNotifier`, ya que son clases `ChangeNotifier` nativas de Flutter.
+* **Variables de Estado Local**: Banderas booleanas, contadores, estados de carga, visibilidad de contraseña, toggles y filtros deben implementarse con `ValueNotifier<T>` y consumirse puntualmente mediante `ValueListenableBuilder<T>`.
+* **Liberación de Memoria**: Liberar todo `ValueNotifier` en el método `dispose()` de la pantalla.
+* **Excepción**: Los `TextEditingController` de Flutter no requieren envolverse en `ValueNotifier`.
 
-#### Ejemplo Canónico:
 ```dart
-class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
-  final _emailController = TextEditingController();
-  final _submitted = ValueNotifier<bool>(false);
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   final _loading = ValueNotifier<bool>(false);
+  final _obscure = ValueNotifier<bool>(true);
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _submitted.dispose();
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
     _loading.dispose();
+    _obscure.dispose();
     super.dispose();
-  }
-
-  Future<void> _handleSubmit() async {
-    _loading.value = true;
-    try {
-      await ref.read(authProvider.notifier).forgotPassword(email);
-      _submitted.value = true;
-      _loading.value = false;
-    } catch (_) {
-      _loading.value = false;
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: ValueListenableBuilder<bool>(
-        valueListenable: _submitted,
-        builder: (context, submitted, _) {
-          if (submitted) return const SuccessView();
-          return ValueListenableBuilder<bool>(
-            valueListenable: _loading,
-            builder: (context, loading, _) {
-              return CustomButton(
-                text: loading ? 'Enviando...' : 'Recuperar Contraseña',
-                onPressed: loading ? null : _handleSubmit,
-              );
-            },
-          );
-        },
-      ),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _loading,
+      builder: (context, loading, _) {
+        return CustomButton(
+          text: loading ? 'Iniciando...' : 'Entrar',
+          onPressed: loading ? null : _submit,
+        );
+      },
     );
   }
 }
 ```
-
