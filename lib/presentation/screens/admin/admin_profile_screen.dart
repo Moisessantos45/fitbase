@@ -159,13 +159,23 @@ class _AdminProfileScreenState extends ConsumerState<AdminProfileScreen> {
 
                         dialogLoading.value = true;
                         try {
-                          final msg = await ref
-                              .read(ownerProvider.notifier)
-                              .updateOwner(
-                                firstName: fn,
-                                lastName: ln,
-                                phone: ph,
-                              );
+                          String msg;
+                          if (owner == null || owner.id == 0) {
+                            await ref.read(ownerProvider.notifier).create(
+                                  firstName: fn,
+                                  lastName: ln,
+                                  phone: ph,
+                                );
+                            msg = 'Perfil completado exitosamente';
+                          } else {
+                            msg = await ref
+                                .read(ownerProvider.notifier)
+                                .updateOwner(
+                                  firstName: fn,
+                                  lastName: ln,
+                                  phone: ph,
+                                );
+                          }
                           navigator.pop();
                           messenger.showSnackBar(
                             SnackBar(

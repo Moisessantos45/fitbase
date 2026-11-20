@@ -12,22 +12,59 @@ class UserNotifier extends AsyncNotifier<UserProfile> {
     return const UserProfile();
   }
 
+  String _extractError(Object e, String fallback) {
+    if (e is DioException && e.response?.data != null) {
+      final errMap = UserMapper.toSafeMap(e.response?.data);
+      final rawErrors = errMap['errors'];
+      if (rawErrors is List && rawErrors.isNotEmpty) {
+        return rawErrors.map((item) => item.toString()).join(', ');
+      }
+      final msg = errMap['message']?.toString();
+      if (msg != null && msg.isNotEmpty) {
+        return msg;
+      }
+    }
+    return e.toString().replaceAll('Exception:', '').trim().isNotEmpty
+        ? e.toString().replaceAll('Exception:', '').trim()
+        : fallback;
+  }
+
   Future<UserProfile> getUser() async {
     state = const AsyncLoading();
     try {
-      final res = await apiAuth.get('/users/me');
+      Response? res;
+      try {
+        res = await apiAuth.get('/users/me');
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          try {
+            res = await apiAuth.get('/user/me');
+          } on DioException catch (e2) {
+            if (e2.response?.statusCode == 404) {
+              const emptyUser = UserProfile();
+              state = const AsyncData(emptyUser);
+              return emptyUser;
+            }
+            rethrow;
+          }
+        } else {
+          rethrow;
+        }
+      }
       final resMap = UserMapper.toSafeMap(res.data);
       final dataMap = UserMapper.toNullableMap(resMap['data']);
       if (dataMap == null) {
-        throw Exception('Error al obtener el perfil de usuario');
+        const emptyUser = UserProfile();
+        state = const AsyncData(emptyUser);
+        return emptyUser;
       }
 
       final user = UserMapper.fromMap(dataMap);
       state = AsyncData(user);
       return user;
-    } catch (e, stack) {
-      state = AsyncError(e, stack);
-      rethrow;
+    } catch (e) {
+      state = const AsyncData(UserProfile());
+      return const UserProfile();
     }
   }
 
@@ -36,27 +73,36 @@ class UserNotifier extends AsyncNotifier<UserProfile> {
     required String lastName,
     String? phone,
   }) async {
+    final prevUser = state.value ?? const UserProfile();
     state = const AsyncLoading();
     try {
-      final res = await apiAuth.post('/users', data: {
+      final payload = <String, dynamic>{
         'first_name': firstName,
         'last_name': lastName,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
-      });
+      };
+      Response res;
+      try {
+        res = await apiAuth.post('/users', data: payload);
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          res = await apiAuth.post('/user', data: payload);
+        } else {
+          rethrow;
+        }
+      }
 
       final resMap = UserMapper.toSafeMap(res.data);
       final dataMap = UserMapper.toNullableMap(resMap['data']);
-      if (dataMap == null) {
-        throw Exception('Error al registrar datos de usuario');
-      }
-
-      final user = UserMapper.fromMap(dataMap);
+      final user = dataMap != null
+          ? UserMapper.fromMap(dataMap)
+          : UserProfile(firstName: firstName, lastName: lastName, phone: phone ?? '');
       state = AsyncData(user);
-      ref.read(authProvider.notifier).getSession();
+      await ref.read(authProvider.notifier).getSession();
       return user;
-    } catch (e, stack) {
-      state = AsyncError(e, stack);
-      rethrow;
+    } catch (e) {
+      state = AsyncData(prevUser);
+      throw Exception(_extractError(e, 'Error al registrar datos de usuario'));
     }
   }
 
@@ -65,25 +111,38 @@ class UserNotifier extends AsyncNotifier<UserProfile> {
     required String lastName,
     String? phone,
   }) async {
+    final prevUser = state.value ?? const UserProfile();
     state = const AsyncLoading();
     try {
-      final res = await apiAuth.put('/users/me', data: {
+      final payload = <String, dynamic>{
         'first_name': firstName,
         'last_name': lastName,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
-      });
+      };
+      Response res;
+      try {
+        res = await apiAuth.put('/users/me', data: payload);
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          res = await apiAuth.put('/user/me', data: payload);
+        } else {
+          rethrow;
+        }
+      }
 
       final resMap = UserMapper.toSafeMap(res.data);
-      final message = resMap['message']?.toString() ?? 'Perfil actualizado exitosamente';
+      final message =
+          resMap['message']?.toString() ?? 'Perfil actualizado exitosamente';
       await getUser();
       return message;
-    } catch (e, stack) {
-      state = AsyncError(e, stack);
-      rethrow;
+    } catch (e) {
+      state = AsyncData(prevUser);
+      throw Exception(_extractError(e, 'Error al actualizar perfil'));
     }
   }
 
   Future<String> uploadAvatar(String filePath) async {
+    final prevUser = state.value ?? const UserProfile();
     state = const AsyncLoading();
     try {
       final fileName = filePath.split('/').last;
@@ -91,14 +150,25 @@ class UserNotifier extends AsyncNotifier<UserProfile> {
         'image': await MultipartFile.fromFile(filePath, filename: fileName),
       });
 
-      final res = await apiAuth.post('/users/me/upload-avatar', data: formData);
+      Response res;
+      try {
+        res = await apiAuth.post('/users/me/upload-avatar', data: formData);
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          res = await apiAuth.post('/user/me/upload-avatar', data: formData);
+        } else {
+          rethrow;
+        }
+      }
+
       final resMap = UserMapper.toSafeMap(res.data);
-      final message = resMap['message']?.toString() ?? 'Avatar actualizado exitosamente';
+      final message =
+          resMap['message']?.toString() ?? 'Avatar actualizado exitosamente';
       await getUser();
       return message;
-    } catch (e, stack) {
-      state = AsyncError(e, stack);
-      rethrow;
+    } catch (e) {
+      state = AsyncData(prevUser);
+      throw Exception(_extractError(e, 'Error al subir avatar'));
     }
   }
 }

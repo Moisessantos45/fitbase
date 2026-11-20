@@ -159,13 +159,23 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
                         dialogLoading.value = true;
                         try {
-                          final msg = await ref
-                              .read(userProvider.notifier)
-                              .updateUser(
-                                firstName: fn,
-                                lastName: ln,
-                                phone: ph.isNotEmpty ? ph : null,
-                              );
+                          String msg;
+                          if (user == null || user.id == 0) {
+                            await ref.read(userProvider.notifier).addUser(
+                                  firstName: fn,
+                                  lastName: ln,
+                                  phone: ph.isNotEmpty ? ph : null,
+                                );
+                            msg = 'Perfil completado exitosamente';
+                          } else {
+                            msg = await ref
+                                .read(userProvider.notifier)
+                                .updateUser(
+                                  firstName: fn,
+                                  lastName: ln,
+                                  phone: ph.isNotEmpty ? ph : null,
+                                );
+                          }
                           navigator.pop();
                           messenger.showSnackBar(
                             SnackBar(

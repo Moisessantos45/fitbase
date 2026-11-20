@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitbase/config/theme/app_colors.dart';
 import 'package:fitbase/config/navigation/custom_navigator.dart';
 import 'package:fitbase/presentation/widgets/custom_button.dart';
+import 'package:fitbase/presentation/providers/cash_register_provider.dart';
+import 'package:fitbase/presentation/widgets/manger/close_cash_dialog.dart';
+import 'package:fitbase/presentation/screens/auth_gate.dart';
 import 'package:fitbase/presentation/screens/admin/admin_settings_screen.dart';
 import 'package:fitbase/presentation/screens/common/change_password_screen.dart';
 import 'package:fitbase/presentation/providers/auth_provider.dart';
@@ -284,6 +287,44 @@ class _ManagerProfileScreenState extends ConsumerState<ManagerProfileScreen> {
               onPressed: () {
                 CustomNavigator.pushFade(context, const ChangePasswordScreen());
               },
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.logout_rounded, size: 20),
+                label: const Text(
+                  'Cerrar Turno de Caja y Salir',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () async {
+                  final box = await ref.read(cashRegisterProvider.notifier).checkCurrent();
+                  if (box != null && box.isOpen && context.mounted) {
+                    CloseCashDialog.show(
+                      context,
+                      onClosed: () async {
+                        await ref.read(authProvider.notifier).logout();
+                        if (context.mounted) {
+                          CustomNavigator.pushAndRemoveUntilFade(context, const AuthGate());
+                        }
+                      },
+                    );
+                  } else {
+                    await ref.read(authProvider.notifier).logout();
+                    if (context.mounted) {
+                      CustomNavigator.pushAndRemoveUntilFade(context, const AuthGate());
+                    }
+                  }
+                },
+              ),
             ),
             const SizedBox(height: 20),
           ],

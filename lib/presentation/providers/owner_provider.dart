@@ -19,15 +19,25 @@ class OwnerNotifier extends AsyncNotifier<OwnerProfile> {
       final resMap = OwnerMapper.toSafeMap(res.data);
       final dataMap = OwnerMapper.toNullableMap(resMap['data']);
       if (dataMap == null) {
-        throw Exception('Error al obtener el perfil de propietario');
+        const emptyOwner = OwnerProfile();
+        state = const AsyncData(emptyOwner);
+        return emptyOwner;
       }
 
       final owner = OwnerMapper.fromMap(dataMap);
       state = AsyncData(owner);
       return owner;
-    } catch (e, stack) {
-      state = AsyncError(e, stack);
-      rethrow;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        const emptyOwner = OwnerProfile();
+        state = const AsyncData(emptyOwner);
+        return emptyOwner;
+      }
+      state = const AsyncData(OwnerProfile());
+      return const OwnerProfile();
+    } catch (_) {
+      state = const AsyncData(OwnerProfile());
+      return const OwnerProfile();
     }
   }
 
@@ -36,6 +46,7 @@ class OwnerNotifier extends AsyncNotifier<OwnerProfile> {
     required String lastName,
     required String phone,
   }) async {
+    final prevOwner = state.value ?? const OwnerProfile();
     state = const AsyncLoading();
     try {
       final res = await apiAuth.post('/owner/complete-profile', data: {
@@ -46,16 +57,14 @@ class OwnerNotifier extends AsyncNotifier<OwnerProfile> {
 
       final resMap = OwnerMapper.toSafeMap(res.data);
       final dataMap = OwnerMapper.toNullableMap(resMap['data']);
-      if (dataMap == null) {
-        throw Exception('Error al completar el perfil');
-      }
-
-      final owner = OwnerMapper.fromMap(dataMap);
+      final owner = dataMap != null
+          ? OwnerMapper.fromMap(dataMap)
+          : OwnerProfile(firstName: firstName, lastName: lastName, phone: phone);
       state = AsyncData(owner);
-      ref.read(authProvider.notifier).getSession();
+      await ref.read(authProvider.notifier).getSession();
       return owner;
-    } catch (e, stack) {
-      state = AsyncError(e, stack);
+    } catch (e) {
+      state = AsyncData(prevOwner);
       rethrow;
     }
   }
